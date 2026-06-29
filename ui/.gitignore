@@ -1,0 +1,16 @@
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Angular build output
+dist/
+.angular/
+
+# IDE
+.idea/
+.vscode/
+
+# Local environment overrides
+src/environments/environment.local.ts

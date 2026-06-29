@@ -1,0 +1,28 @@
+html,
+body {
+  height: 100%;
+  margin: 0;
+  font-family: Roboto, 'Helvetica Neue', sans-serif;
+}
+
+/* Utility — fills remaining flex space */
+.fill-space {
+  flex: 1 1 auto;
+}
+
+/* Standard page wrapper: centred, padded */
+.page-container {
+  padding: 24px;
+  max-width: 1280px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+/* Snackbar colour overrides */
+.snack-success .mdc-snackbar__surface {
+  background-color: #2e7d32 !important;
+}
+
+.snack-error .mdc-snackbar__surface {
+  background-color: #c62828 !important;
+}
