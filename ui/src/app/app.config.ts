@@ -1,7 +1,7 @@
 import { ApplicationConfig, provideZoneChangeDetection } from '@angular/core';
 import { provideRouter, withComponentInputBinding } from '@angular/router';
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
-import { provideAnimations } from '@angular/platform-browser/animations';
+import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
 import { MAT_DATE_LOCALE } from '@angular/material/core';
 
 import { appRoutes } from './app.routes';
@@ -15,7 +15,7 @@ export const appConfig: ApplicationConfig = {
     provideZoneChangeDetection({ eventCoalescing: true }),
     provideRouter(appRoutes, withComponentInputBinding()),
     provideHttpClient(withInterceptors([apiInterceptor, errorInterceptor])),
-    provideAnimations(),
+    provideAnimationsAsync(),
     { provide: MAT_DATE_LOCALE, useValue: 'en-US' },
     { provide: ENVIRONMENT, useValue: environment },
   ],
