@@ -1,8 +1,8 @@
 -- V2__create_organization.sql
--- Root anchor for the entire ERP; all domain tables reference org_id
+-- Root anchor for the entire ERP; all domain tables reference org_id.
 
 CREATE TABLE organization (
-    id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    id                  CHAR(36)            PRIMARY KEY DEFAULT (UUID()),
     name                VARCHAR(255)        NOT NULL,
     legal_name          VARCHAR(255),
     tax_id_ein          VARCHAR(20)         UNIQUE,
@@ -20,6 +20,6 @@ CREATE TABLE organization (
     founded_date        DATE,
     fiscal_year_start   DATE,
     logo_url            VARCHAR(500),
-    created_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-    updated_at          TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW()
-);
+    created_at          DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at          DATETIME            NOT NULL DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
