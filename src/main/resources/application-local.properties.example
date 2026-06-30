@@ -1,0 +1,15 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Local developer overrides — NEVER commit the real file.
+#
+# Usage:
+#   1. cp application-local.properties.example application-local.properties
+#   2. Fill in your local MySQL credentials below.
+#   3. Start the app with --spring.profiles.active=local
+#      or set SPRING_PROFILES_ACTIVE=local in your IDE run configuration.
+#
+# application-local.properties is listed in .gitignore and will not be staged.
+# ─────────────────────────────────────────────────────────────────────────────
+
+spring.datasource.url=jdbc:mysql://localhost:3306/svirerp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
+spring.datasource.username=YOUR_DB_USER
+spring.datasource.password=YOUR_DB_PASSWORD

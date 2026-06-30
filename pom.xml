@@ -81,6 +81,16 @@
 
     <build>
         <plugins>
+            <!--
+                Maven Wrapper plugin: regenerate wrapper scripts with
+                  ./mvnw wrapper:wrapper -Dmaven=3.9.6
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-wrapper-plugin</artifactId>
+                <version>3.3.2</version>
+            </plugin>
+
             <!-- Produces a self-contained fat JAR; run with `java -jar target/svirerp-*.jar` -->
             <plugin>
                 <groupId>org.springframework.boot</groupId>

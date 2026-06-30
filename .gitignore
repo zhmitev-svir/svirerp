@@ -1,0 +1,25 @@
+# ── Maven build output ────────────────────────────────────────────────────────
+target/
+
+# ── Maven Wrapper download cache (jar is downloaded per-machine, not stored) ──
+.mvn/wrapper/maven-wrapper.jar
+
+# ── IDE ───────────────────────────────────────────────────────────────────────
+.idea/
+*.iml
+*.ipr
+*.iws
+.classpath
+.project
+.settings/
+*.launch
+
+# ── Local configuration — never commit credentials ────────────────────────────
+src/main/resources/application-local.properties
+src/main/resources/application-*.properties
+!src/main/resources/application.properties
+!src/main/resources/application-local.properties.example
+
+# ── OS ────────────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
