@@ -22,6 +22,23 @@ while [ -h "$PRG" ]; do
 done
 
 APP_HOME="$(cd "$(dirname "$PRG")" && pwd)"
+
+# ---------------------------------------------------------------------------
+# On Windows (Git Bash = MINGW, MSYS2 = MSYS, Cygwin) the Unix-style path
+# that `pwd` returns (e.g. /h/workspaces/svirerp) is not understood by the
+# Windows JVM.  Convert it to a Windows-native form (H:/workspaces/svirerp)
+# which Java accepts on all platforms via forward slashes.
+# ---------------------------------------------------------------------------
+case "$(uname)" in
+  CYGWIN*)
+    APP_HOME="$(cygpath --path --mixed "$APP_HOME")"
+    ;;
+  MINGW* | MSYS*)
+    # pwd -W returns the Windows-style path with forward slashes
+    APP_HOME_W="$(cd "$APP_HOME" && pwd -W 2>/dev/null)" && APP_HOME="$APP_HOME_W" || true
+    ;;
+esac
+
 WRAPPER_JAR="$APP_HOME/.mvn/wrapper/maven-wrapper.jar"
 WRAPPER_PROPS="$APP_HOME/.mvn/wrapper/maven-wrapper.properties"
 
