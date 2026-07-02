@@ -23,7 +23,7 @@ Non-profit ERP system for the SVIR organization — Spring Boot 3 REST API backe
 
 | Requirement | Minimum | Notes |
 |---|---|---|
-| Java JDK | 17 | `java -version` to confirm |
+| Java JDK | 25 | `java -version` to confirm |
 | MySQL | 8.0 | Must be running before starting the app |
 | Maven | — | **Not required** — use the included wrapper (`mvnw`) |
 | Node.js | 20 LTS | Only needed for the Angular UI |
@@ -69,7 +69,10 @@ cp src/main/resources/application-local.properties.example \
 # Edit application-local.properties with your MySQL user/password
 
 # 3. Run Flyway migrations (creates all 26 tables)
-./mvnw flyway:migrate -Dflyway.user=root -Dflyway.password=your_password
+./mvnw flyway:migrate \
+  -Dflyway.url="jdbc:mysql://localhost:3306/svirerp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true" \
+  -Dflyway.user=root \
+  -Dflyway.password=your_password
 
 # 4. Build and run
 ./mvnw clean package -DskipTests
@@ -137,6 +140,7 @@ java -jar target/svirerp-1.0.0-SNAPSHOT.jar \
 | `server.port` | `8080` | HTTP port |
 | `spring.jpa.show-sql` | `false` | Log SQL to console |
 | `spring.flyway.baseline-on-migrate` | `true` | Safe for databases that already have data |
+| `app.cors.allowed-origins` | `http://localhost:4200` | Comma-separated origins allowed to call `/api/**`; override via `SVIRERP_CORS_ALLOWED_ORIGINS` when the UI is served from a different host |
 
 ---
 
