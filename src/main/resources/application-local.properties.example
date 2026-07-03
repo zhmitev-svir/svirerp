@@ -13,3 +13,17 @@
 spring.datasource.url=jdbc:mysql://localhost:3306/svirerp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true
 spring.datasource.username=YOUR_DB_USER
 spring.datasource.password=YOUR_DB_PASSWORD
+
+# Google OAuth2 client for LOCAL DEVELOPMENT — create a separate dev-only
+# OAuth Client in Google Cloud Console (redirect URI
+# http://localhost:8080/login/oauth2/code/google). Do not reuse the
+# production client's secret here.
+spring.security.oauth2.client.registration.google.client-id=GOOGLE_CLIENT_ID
+spring.security.oauth2.client.registration.google.client-secret=GOOGLE_CLIENT_ID
+
+# Break-glass local admin login — leave blank to disable. Generate the hash
+# once via a throwaway `new BCryptPasswordEncoder().encode("your-password")`
+# call; never commit a real hash or plaintext password here.
+
+app.auth.admin.username = ADMIN_USER_NAME
+app.auth.admin.password-hash = ADMIN_PASSWORD_HASH

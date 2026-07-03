@@ -10,12 +10,13 @@ Non-profit ERP system for the SVIR organization — Spring Boot 3 REST API backe
 2. [Project Structure](#project-structure)
 3. [Quick Start](#quick-start)
 4. [Configuration](#configuration)
-5. [Building](#building)
-6. [Database Migrations](#database-migrations)
-7. [Running the API](#running-the-api)
-8. [Angular UI](#angular-ui)
-9. [API Overview](#api-overview)
-10. [Migration Reference](#migration-reference)
+5. [Authentication](#authentication)
+6. [Building](#building)
+7. [Database Migrations](#database-migrations)
+8. [Running the API](#running-the-api)
+9. [Angular UI](#angular-ui)
+10. [API Overview](#api-overview)
+11. [Migration Reference](#migration-reference)
 
 ---
 
@@ -27,6 +28,7 @@ Non-profit ERP system for the SVIR organization — Spring Boot 3 REST API backe
 | MySQL | 8.0 | Must be running before starting the app |
 | Maven | — | **Not required** — use the included wrapper (`mvnw`) |
 | Node.js | 20 LTS | Only needed for the Angular UI |
+| Google Cloud / Workspace admin access | — | Needed once to create an OAuth 2.0 Client — see [Authentication](#authentication). The app will not start without a client ID/secret configured, the same way it won't start without MySQL credentials. |
 
 ---
 
@@ -74,7 +76,10 @@ cp src/main/resources/application-local.properties.example \
   -Dflyway.user=root \
   -Dflyway.password=your_password
 
-# 4. Build and run
+# 4. Set up Google sign-in (required — see Authentication section).
+#    Add your dev OAuth Client's id/secret to application-local.properties.
+
+# 5. Build and run
 ./mvnw clean package -DskipTests
 java -jar target/svirerp-1.0.0-SNAPSHOT.jar --spring.profiles.active=local
 
@@ -141,6 +146,45 @@ java -jar target/svirerp-1.0.0-SNAPSHOT.jar \
 | `spring.jpa.show-sql` | `false` | Log SQL to console |
 | `spring.flyway.baseline-on-migrate` | `true` | Safe for databases that already have data |
 | `app.cors.allowed-origins` | `http://localhost:4200` | Comma-separated origins allowed to call `/api/**`; override via `SVIRERP_CORS_ALLOWED_ORIGINS` when the UI is served from a different host |
+| `app.auth.google.allowed-domain` | `svivanrilski.com` | Google Workspace hosted domain allowed to sign in; override via `SVIRERP_GOOGLE_ALLOWED_DOMAIN` |
+| `spring.security.oauth2.client.registration.google.client-id` | *(empty — required)* | Google OAuth 2.0 Client ID; set via `SVIRERP_GOOGLE_CLIENT_ID` or `application-local.properties` |
+| `spring.security.oauth2.client.registration.google.client-secret` | *(empty — required)* | Google OAuth 2.0 Client secret; set via `SVIRERP_GOOGLE_CLIENT_SECRET` or `application-local.properties` |
+| `app.auth.admin.username` / `app.auth.admin.password-hash` | *(empty — disabled)* | Break-glass local admin login; blank disables it. Set via `SVIRERP_ADMIN_USERNAME` / `SVIRERP_ADMIN_PASSWORD_HASH` |
+
+---
+
+## Authentication
+
+The API is gated behind a login — every `/api/**` request requires an authenticated session. Login is purely a gate: once signed in, via either method below, a user has the same full access the API already exposes. There are two ways in:
+
+### Google sign-in (primary)
+
+Restricted to accounts in the org's Google Workspace domain (`app.auth.google.allowed-domain`, default `svivanrilski.com`), enforced twice — once by Google itself (consent screen set to "Internal") and again by the app (checking the `hd` claim on the ID token).
+
+**One-time Google Cloud Console setup:**
+
+1. **OAuth consent screen** → set **User Type = Internal**. This restricts sign-in to your Workspace org at Google's level, before the app ever sees the request.
+2. **Create two OAuth 2.0 Client IDs** (Web application type) — one per environment, so dev and prod secrets are independent:
+   - **Dev**: Authorized redirect URI `http://localhost:8080/login/oauth2/code/google`
+   - **Prod**: Authorized redirect URI `https://svirerp.svivanrilski.com/login/oauth2/code/google`
+3. Put the **dev** client's id/secret in `application-local.properties` (gitignored):
+   ```properties
+   spring.security.oauth2.client.registration.google.client-id=YOUR_DEV_CLIENT_ID
+   spring.security.oauth2.client.registration.google.client-secret=YOUR_DEV_CLIENT_SECRET
+   ```
+   Put the **prod** client's id/secret in real env vars on the deploy target: `SVIRERP_GOOGLE_CLIENT_ID`, `SVIRERP_GOOGLE_CLIENT_SECRET`.
+
+The app will not start if `client-id` is blank — this mirrors the existing MySQL-credentials requirement, not a new restriction pattern.
+
+### Local admin login (break-glass fallback)
+
+A single admin account, for when Google sign-in is unavailable. Disabled by default (both properties blank). To enable it:
+
+1. Generate a bcrypt hash of your chosen password — there's no script for this in the repo; the simplest way is a throwaway call to `new BCryptPasswordEncoder().encode("your-password")` (e.g. in a scratch test or a `jshell` session with Spring Security on the classpath).
+2. Set `app.auth.admin.username` and `app.auth.admin.password-hash` (the bcrypt hash, never the plaintext password) via `SVIRERP_ADMIN_USERNAME` / `SVIRERP_ADMIN_PASSWORD_HASH` in prod, or in `application-local.properties` for local testing.
+3. Sign in at `/portal-access` — this route is intentionally not linked from the login page or any navigation; it's meant to be known only to whoever holds the admin credentials.
+
+Failed attempts are rate-limited (5 failures per IP within 15 minutes triggers a 15-minute lockout) and every attempt — success, failure, or lockout — is audit-logged under the `AUDIT.local-admin-login` logger name.
 
 ---
 
@@ -161,6 +205,23 @@ On first run the wrapper downloads Maven 3.9.6 automatically into your local Mav
 ```
 
 The fat JAR produced by `spring-boot-maven-plugin` embeds Tomcat and all dependencies. It is fully self-contained — no application server required.
+
+### Release build (UI + API in one jar)
+
+In production, the Spring Boot app serves the Angular build itself as static resources, so UI and API share one origin — no separate reverse proxy needed. This is a two-command build; `mvnw` does **not** invoke `npm` itself:
+
+```bash
+# 1. Build the Angular production bundle
+cd ui && npm run build && cd ..
+
+# 2. Build the jar — a Maven step copies ui/dist/svirerp-ui/browser into the
+#    jar automatically if present. A backend-only build (skip step 1) still
+#    works fine; the jar just won't have a UI to serve.
+./mvnw clean package -DskipTests
+
+java -jar target/svirerp-1.0.0-SNAPSHOT.jar --spring.profiles.active=local
+# → http://localhost:8080 now serves both the Angular app and /api/**
+```
 
 ### Regenerate the Maven Wrapper
 
@@ -260,10 +321,12 @@ The Angular 21 front-end lives in `ui/`. It runs separately from the Spring Boot
 cd ui
 npm install          # first time only
 npm start            # dev server at http://localhost:4200
-npm run build        # production build → ui/dist/svirerp-ui/
+npm run build        # production build → ui/dist/svirerp-ui/browser/
 ```
 
-The development API proxy is not yet configured; the UI calls `http://localhost:8080/api` directly (set in `ui/src/environments/environment.ts`).
+`npm start` proxies `/api`, `/oauth2`, `/login`, and `/logout` to `http://localhost:8080` (see `ui/proxy.conf.json`), so the browser sees the dev server as same-origin — matching production, where Spring Boot serves both the UI and the API from one origin. This matters for session-cookie-based login: cross-origin cookies would need extra `SameSite`/HTTPS handling that same-origin avoids entirely.
+
+Visiting the app while logged out redirects to `/login` (Google sign-in). The break-glass local admin form lives at `/portal-access` — see [Authentication](#authentication).
 
 ---
 
@@ -273,6 +336,7 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 
 | Domain | Base path | Notes |
 |---|---|---|
+| Auth | `GET /api/auth/me` | Current user `{ email, name, provider }`; 401 means not logged in |
 | Persons | `GET/POST /api/persons` | `GET /api/persons/{id}`, `PUT`, `DELETE` |
 | Organizations | `GET/POST /api/organizations` | |
 | Membership types | `GET/POST /api/organizations/{id}/membership-types` | |

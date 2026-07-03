@@ -1,5 +1,6 @@
 import { HttpInterceptorFn, HttpErrorResponse } from '@angular/common/http';
 import { inject } from '@angular/core';
+import { Router } from '@angular/router';
 import { catchError, throwError } from 'rxjs';
 import { NotificationService } from '../services/notification.service';
 import { ApiError } from '../models/api.model';
@@ -13,14 +14,25 @@ import { ApiError } from '../models/api.model';
  */
 export const errorInterceptor: HttpInterceptorFn = (req, next) => {
   const notifications = inject(NotificationService);
+  const router = inject(Router);
 
   return next(req).pipe(
     catchError((err: HttpErrorResponse) => {
       const apiError = err.error as ApiError | undefined;
       const message = apiError?.message ?? 'An unexpected error occurred';
 
+      // GET /api/auth/me legitimately 401s for every logged-out user on every
+      // app load (see AuthService), and POST /login/local 401s on a wrong
+      // password — both are expected outcomes handled inline by their own
+      // component, not a "session expired, redirect to login" situation.
+      const isAuthEndpoint = req.url.endsWith('/auth/me') || req.url.endsWith('/login/local');
+
       if (err.status === 0) {
         notifications.error('Cannot reach the server. Check your connection.');
+      } else if (err.status === 401) {
+        if (!isAuthEndpoint) {
+          router.navigate(['/login']);
+        }
       } else if (err.status >= 500) {
         notifications.error('Server error — please try again later.');
       } else if (err.status === 409) {

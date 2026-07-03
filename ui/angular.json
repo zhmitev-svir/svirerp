@@ -58,7 +58,8 @@
             "production": { "buildTarget": "svirerp-ui:build:production" },
             "development": {
               "buildTarget": "svirerp-ui:build:development",
-              "hmr": true
+              "hmr": true,
+              "proxyConfig": "proxy.conf.json"
             }
           },
           "defaultConfiguration": "development"

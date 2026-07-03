@@ -1,10 +1,21 @@
 import { Routes } from '@angular/router';
 import { ShellComponent } from './layout/shell/shell.component';
+import { authGuard } from './core/guards/auth.guard';
 
 export const appRoutes: Routes = [
   {
+    path: 'login',
+    loadComponent: () => import('./features/auth/login.component').then(m => m.LoginComponent),
+  },
+  {
+    path: 'portal-access',
+    loadComponent: () =>
+      import('./features/auth/portal-access.component').then(m => m.PortalAccessComponent),
+  },
+  {
     path: '',
     component: ShellComponent,
+    canActivate: [authGuard],
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       {
