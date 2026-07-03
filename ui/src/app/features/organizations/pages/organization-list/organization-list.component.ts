@@ -9,6 +9,7 @@ import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/a
 import { DataTableComponent, TableColumn, TableAction } from '../../../../shared/components/data-table/data-table.component';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { OrganizationFormComponent } from '../organization-form/organization-form.component';
 
 @Component({
   selector: 'app-organization-list',
@@ -44,14 +45,15 @@ export class OrganizationListComponent implements OnInit {
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
 
   readonly columns: TableColumn[] = [
-    { key: 'name',  header: 'Name' },
-    { key: 'taxId', header: 'Tax ID' },
-    { key: 'email', header: 'Email' },
-    { key: 'phone', header: 'Phone' },
-    { key: 'city',  header: 'City' },
+    { key: 'name',      header: 'Name' },
+    { key: 'taxIdEin',  header: 'Tax ID' },
+    { key: 'email',     header: 'Email' },
+    { key: 'phone',     header: 'Phone' },
+    { key: 'city',      header: 'City' },
   ];
 
   readonly actions: TableAction[] = [
+    { icon: 'edit',   label: 'Edit',   action: (o: Organization) => this.openForm(o) },
     { icon: 'delete', label: 'Delete', action: (o: Organization) => this.confirmDelete(o) },
   ];
 
@@ -64,9 +66,11 @@ export class OrganizationListComponent implements OnInit {
     this.loadPage();
   }
 
-  openForm(): void {
-    // Organization form dialog — to be implemented in next iteration
-    this.notifications.info('Organization form coming soon.');
+  openForm(org?: Organization): void {
+    this.dialog
+      .open(OrganizationFormComponent, { width: '540px', data: org ?? null })
+      .afterClosed()
+      .subscribe(saved => { if (saved) this.loadPage(); });
   }
 
   confirmDelete(org: Organization): void {

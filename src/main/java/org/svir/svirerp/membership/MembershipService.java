@@ -62,6 +62,7 @@ public class MembershipService {
         existing.setAnnualFee(patch.getAnnualFee());
         existing.setDurationMonths(patch.getDurationMonths());
         existing.setIsActive(patch.getIsActive());
+        existing.setCanVote(patch.getCanVote());
         existing.setBenefits(patch.getBenefits());
         existing.setMaxMembers(patch.getMaxMembers());
         return typeRepo.save(existing);
@@ -95,6 +96,12 @@ public class MembershipService {
         Person person = personService.findById(member.getPerson().getId());
         Organization org = orgService.findById(member.getOrg().getId());
         MembershipType type = findTypeById(member.getMembershipType().getId());
+        // A person may hold at most one membership per organisation — to switch
+        // membership type, update the existing Member record instead of creating another.
+        if (memberRepo.existsByPersonIdAndOrgId(person.getId(), org.getId())) {
+            throw new IllegalArgumentException(
+                    person.getFirstName() + " " + person.getLastName() + " already has a membership in this organization");
+        }
         member.setPerson(person);
         member.setOrg(org);
         member.setMembershipType(type);

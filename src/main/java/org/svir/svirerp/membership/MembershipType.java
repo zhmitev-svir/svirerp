@@ -52,6 +52,10 @@ public class MembershipType {
     @Column(name = "is_active", nullable = false)
     private Boolean isActive = true;
 
+    /** Whether members holding this type are eligible to vote (e.g. in governance resolutions). */
+    @Column(name = "can_vote", nullable = false)
+    private Boolean canVote = false;
+
     @Column(columnDefinition = "TEXT")
     private String benefits;
 

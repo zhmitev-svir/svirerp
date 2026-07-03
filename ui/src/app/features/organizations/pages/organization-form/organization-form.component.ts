@@ -9,12 +9,12 @@ import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 
-import { PersonService } from '../../services/person.service';
+import { OrganizationService } from '../../services/organization.service';
 import { NotificationService } from '../../../../core/services/notification.service';
-import { Person } from '../../../../core/models/domain.model';
+import { Organization } from '../../../../core/models/domain.model';
 
 @Component({
-  selector: 'app-person-form',
+  selector: 'app-organization-form',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   imports: [
@@ -26,44 +26,55 @@ import { Person } from '../../../../core/models/domain.model';
     MatProgressSpinnerModule,
   ],
   template: `
-    <h2 mat-dialog-title>{{ isEdit ? 'Edit' : 'Add' }} Person</h2>
+    <h2 mat-dialog-title>{{ isEdit ? 'Edit' : 'Add' }} Organization</h2>
 
     <mat-dialog-content>
-      <form [formGroup]="form" class="person-form">
+      <form [formGroup]="form" class="organization-form">
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Name</mat-label>
+          <input matInput formControlName="name" autocomplete="organization" />
+          @if (form.controls.name.invalid && form.controls.name.touched) {
+            <mat-error>Name is required</mat-error>
+          }
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="full-width">
+          <mat-label>Legal Name</mat-label>
+          <input matInput formControlName="legalName" />
+        </mat-form-field>
 
         <div class="form-row">
           <mat-form-field appearance="outline" class="flex-1">
-            <mat-label>First Name</mat-label>
-            <input matInput formControlName="firstName" autocomplete="given-name" />
-            @if (form.controls.firstName.invalid && form.controls.firstName.touched) {
-              <mat-error>First name is required</mat-error>
-            }
+            <mat-label>Tax ID / EIN</mat-label>
+            <input matInput formControlName="taxIdEin" />
           </mat-form-field>
 
           <mat-form-field appearance="outline" class="flex-1">
-            <mat-label>Last Name</mat-label>
-            <input matInput formControlName="lastName" autocomplete="family-name" />
-            @if (form.controls.lastName.invalid && form.controls.lastName.touched) {
-              <mat-error>Last name is required</mat-error>
-            }
+            <mat-label>Nonprofit Type</mat-label>
+            <input matInput formControlName="nonprofitType" placeholder="e.g. 501(c)(3)" />
           </mat-form-field>
         </div>
 
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Email</mat-label>
           <input matInput type="email" formControlName="email" autocomplete="email" />
-          @if (form.controls.email.hasError('required') && form.controls.email.touched) {
-            <mat-error>Email is required</mat-error>
-          }
           @if (form.controls.email.hasError('email')) {
             <mat-error>Enter a valid email address</mat-error>
           }
         </mat-form-field>
 
-        <mat-form-field appearance="outline" class="full-width">
-          <mat-label>Phone</mat-label>
-          <input matInput type="tel" formControlName="phone" autocomplete="tel" />
-        </mat-form-field>
+        <div class="form-row">
+          <mat-form-field appearance="outline" class="flex-1">
+            <mat-label>Phone</mat-label>
+            <input matInput type="tel" formControlName="phone" autocomplete="tel" />
+          </mat-form-field>
+
+          <mat-form-field appearance="outline" class="flex-1">
+            <mat-label>Website</mat-label>
+            <input matInput formControlName="website" autocomplete="url" />
+          </mat-form-field>
+        </div>
 
         <mat-form-field appearance="outline" class="full-width">
           <mat-label>Address</mat-label>
@@ -102,37 +113,40 @@ import { Person } from '../../../../core/models/domain.model';
     </mat-dialog-actions>
   `,
   styles: [`
-    .person-form { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; }
+    .organization-form { display: flex; flex-direction: column; gap: 4px; padding-top: 8px; }
     .full-width { width: 100%; }
     .form-row { display: flex; gap: 12px; width: 100%; }
     .flex-1 { flex: 1; }
     .flex-2 { flex: 2; }
   `],
 })
-export class PersonFormComponent implements OnInit {
+export class OrganizationFormComponent implements OnInit {
   private fb = inject(FormBuilder);
-  private personService = inject(PersonService);
-  private dialogRef = inject(MatDialogRef<PersonFormComponent>);
+  private orgService = inject(OrganizationService);
+  private dialogRef = inject(MatDialogRef<OrganizationFormComponent>);
   private notifications = inject(NotificationService);
-  person = inject<Person | null>(MAT_DIALOG_DATA);
+  org = inject<Organization | null>(MAT_DIALOG_DATA);
 
-  isEdit = !!this.person;
+  isEdit = !!this.org;
   saving = signal(false);
 
   form = this.fb.nonNullable.group({
-    firstName:    ['', Validators.required],
-    lastName:     ['', Validators.required],
-    email:        ['', [Validators.required, Validators.email]],
-    phone:        [''],
-    addressLine1: [''],
-    city:         [''],
-    state:        [''],
-    zip:          [''],
+    name:           ['', Validators.required],
+    legalName:      [''],
+    taxIdEin:       [''],
+    nonprofitType:  [''],
+    email:          ['', Validators.email],
+    phone:          [''],
+    website:        [''],
+    addressLine1:   [''],
+    city:           [''],
+    state:          [''],
+    zip:            [''],
   });
 
   ngOnInit(): void {
-    if (this.person) {
-      this.form.patchValue(this.person);
+    if (this.org) {
+      this.form.patchValue(this.org);
     }
   }
 
@@ -144,13 +158,13 @@ export class PersonFormComponent implements OnInit {
     this.saving.set(true);
     const payload = this.form.getRawValue();
     const op = this.isEdit
-      ? this.personService.update(this.person!.id, payload)
-      : this.personService.create(payload);
+      ? this.orgService.update(this.org!.id, payload)
+      : this.orgService.create(payload);
 
     op.subscribe({
-      next: (result) => {
-        this.notifications.success(`Person ${this.isEdit ? 'updated' : 'created'}.`);
-        this.dialogRef.close(result);
+      next: () => {
+        this.notifications.success(`Organization ${this.isEdit ? 'updated' : 'created'}.`);
+        this.dialogRef.close(true);
       },
       error: () => this.saving.set(false),
     });

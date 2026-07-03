@@ -50,7 +50,7 @@ svirerp/
 │       └── resources/
 │           ├── application.properties              # Base config (env-var placeholders)
 │           ├── application-local.properties.example  # Copy & fill for local dev
-│           └── db/migration/                       # Flyway V1–V26 SQL scripts
+│           └── db/migration/                       # Flyway V1–V27 SQL scripts
 ├── ui/                          # Angular 21 front-end (see Angular UI section)
 ├── mvnw                         # Unix Maven Wrapper
 ├── mvnw.cmd                     # Windows Maven Wrapper
@@ -339,8 +339,8 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | Auth | `GET /api/auth/me` | Current user `{ email, name, provider }`; 401 means not logged in |
 | Persons | `GET/POST /api/persons` | `GET /api/persons/{id}`, `PUT`, `DELETE` |
 | Organizations | `GET/POST /api/organizations` | |
-| Membership types | `GET/POST /api/organizations/{id}/membership-types` | |
-| Members | `GET/POST /api/members` | |
+| Membership types | `GET /api/organizations/{id}/membership-types` | `POST/PUT /api/membership-types[/{id}]`, `DELETE /api/membership-types/{id}` |
+| Members | `GET /api/organizations/{id}/members` | `POST/PUT /api/members[/{id}]`, `DELETE`, `GET .../expired` |
 | Member payments | `GET/POST /api/member-payments` | |
 | Trustees | `GET/POST /api/trustees` | |
 | Committees | `GET/POST /api/committees` | |
@@ -386,3 +386,4 @@ Pagination is available on all list endpoints via `?page=0&size=20&sort=field,as
 | V24 | `bank_transaction` |
 | V25 | `bank_reconciliation` (`difference` is a MySQL generated column) |
 | V26 | `reconciliation_item` |
+| V27 | `membership_type` + `can_vote` column |
