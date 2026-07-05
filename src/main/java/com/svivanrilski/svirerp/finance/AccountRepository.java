@@ -1,4 +1,4 @@
-package org.svir.svirerp.finance;
+package com.svivanrilski.svirerp.finance;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

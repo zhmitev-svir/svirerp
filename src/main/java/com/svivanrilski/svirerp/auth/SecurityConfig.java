@@ -1,4 +1,4 @@
-package org.svir.svirerp.auth;
+package com.svivanrilski.svirerp.auth;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

@@ -1,4 +1,4 @@
-package org.svir.svirerp.organization;
+package com.svivanrilski.svirerp.organization;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;

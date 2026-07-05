@@ -1,11 +1,11 @@
-package org.svir.svirerp.finance;
+package com.svivanrilski.svirerp.finance;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import org.svir.svirerp.organization.Organization;
-import org.svir.svirerp.person.Person;
+import com.svivanrilski.svirerp.organization.Organization;
+import com.svivanrilski.svirerp.person.Person;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

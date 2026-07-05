@@ -1,4 +1,4 @@
-package org.svir.svirerp.person;
+package com.svivanrilski.svirerp.person;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

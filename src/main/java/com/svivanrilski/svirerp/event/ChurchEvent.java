@@ -1,4 +1,4 @@
-package org.svir.svirerp.event;
+package com.svivanrilski.svirerp.event;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;

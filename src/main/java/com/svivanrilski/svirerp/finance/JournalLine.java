@@ -1,4 +1,4 @@
-package org.svir.svirerp.finance;
+package com.svivanrilski.svirerp.finance;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Min;

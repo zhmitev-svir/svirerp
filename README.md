@@ -38,7 +38,7 @@ Non-profit ERP system for the SVIR organization — Spring Boot 3 REST API backe
 svirerp/
 ├── src/
 │   └── main/
-│       ├── java/org/svir/svirerp/
+│       ├── java/com/svivanrilski/svirerp/
 │       │   ├── common/          # GlobalExceptionHandler, ResourceNotFoundException
 │       │   ├── person/          # Entity, Repository, Service, Controller
 │       │   ├── organization/

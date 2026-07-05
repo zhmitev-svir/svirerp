@@ -1,4 +1,4 @@
-package org.svir.svirerp.auth;
+package com.svivanrilski.svirerp.auth;
 
 import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;

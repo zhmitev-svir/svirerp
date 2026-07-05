@@ -1,4 +1,4 @@
-package org.svir.svirerp.membership;
+package com.svivanrilski.svirerp.membership;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

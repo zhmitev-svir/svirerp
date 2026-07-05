@@ -1,4 +1,4 @@
-package org.svir.svirerp.person;
+package com.svivanrilski.svirerp.person;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.Email;

@@ -1,4 +1,4 @@
-package org.svir.svirerp;
+package com.svivanrilski.svirerp;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;

@@ -1,10 +1,10 @@
-package org.svir.svirerp.volunteer;
+package com.svivanrilski.svirerp.volunteer;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.*;
-import org.svir.svirerp.event.CalendarEvent;
+import com.svivanrilski.svirerp.event.CalendarEvent;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;

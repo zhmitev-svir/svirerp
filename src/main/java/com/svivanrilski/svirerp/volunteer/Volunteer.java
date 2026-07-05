@@ -1,10 +1,10 @@
-package org.svir.svirerp.volunteer;
+package com.svivanrilski.svirerp.volunteer;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import org.svir.svirerp.organization.Organization;
-import org.svir.svirerp.person.Person;
+import com.svivanrilski.svirerp.organization.Organization;
+import com.svivanrilski.svirerp.person.Person;
 
 import java.time.LocalDate;
 import java.util.UUID;

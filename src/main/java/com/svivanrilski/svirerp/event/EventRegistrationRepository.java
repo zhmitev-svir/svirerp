@@ -1,4 +1,4 @@
-package org.svir.svirerp.event;
+package com.svivanrilski.svirerp.event;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

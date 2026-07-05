@@ -15,7 +15,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>org.svir</groupId>
+    <groupId>com.svivanrilski</groupId>
     <artifactId>svirerp</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>

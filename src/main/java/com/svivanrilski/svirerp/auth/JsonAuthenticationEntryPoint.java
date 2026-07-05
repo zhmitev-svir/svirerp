@@ -1,4 +1,4 @@
-package org.svir.svirerp.auth;
+package com.svivanrilski.svirerp.auth;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;

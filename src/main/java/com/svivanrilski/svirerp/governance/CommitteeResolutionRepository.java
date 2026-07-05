@@ -1,4 +1,4 @@
-package org.svir.svirerp.governance;
+package com.svivanrilski.svirerp.governance;
 
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

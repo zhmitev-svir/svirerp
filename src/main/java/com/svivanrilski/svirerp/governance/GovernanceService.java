@@ -1,15 +1,15 @@
-package org.svir.svirerp.governance;
+package com.svivanrilski.svirerp.governance;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.svir.svirerp.common.ResourceNotFoundException;
-import org.svir.svirerp.organization.Organization;
-import org.svir.svirerp.organization.OrganizationService;
-import org.svir.svirerp.person.Person;
-import org.svir.svirerp.person.PersonService;
+import com.svivanrilski.svirerp.common.ResourceNotFoundException;
+import com.svivanrilski.svirerp.organization.Organization;
+import com.svivanrilski.svirerp.organization.OrganizationService;
+import com.svivanrilski.svirerp.person.Person;
+import com.svivanrilski.svirerp.person.PersonService;
 
 import java.util.Set;
 import java.util.UUID;

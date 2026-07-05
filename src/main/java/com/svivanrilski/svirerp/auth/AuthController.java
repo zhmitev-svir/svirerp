@@ -1,4 +1,4 @@
-package org.svir.svirerp.auth;
+package com.svivanrilski.svirerp.auth;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.core.oidc.user.OidcUser;

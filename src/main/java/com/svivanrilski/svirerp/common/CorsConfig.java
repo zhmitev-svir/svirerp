@@ -1,4 +1,4 @@
-package org.svir.svirerp.common;
+package com.svivanrilski.svirerp.common;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Configuration;

@@ -1,4 +1,4 @@
-package org.svir.svirerp.finance;
+package com.svivanrilski.svirerp.finance;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

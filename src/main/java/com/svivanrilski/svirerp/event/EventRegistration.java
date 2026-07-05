@@ -1,9 +1,9 @@
-package org.svir.svirerp.event;
+package com.svivanrilski.svirerp.event;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import org.svir.svirerp.person.Person;
+import com.svivanrilski.svirerp.person.Person;
 
 import java.math.BigDecimal;
 import java.time.OffsetDateTime;

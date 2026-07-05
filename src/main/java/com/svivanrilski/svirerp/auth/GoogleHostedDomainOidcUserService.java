@@ -1,4 +1,4 @@
-package org.svir.svirerp.auth;
+package com.svivanrilski.svirerp.auth;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.oauth2.client.oidc.userinfo.OidcUserRequest;

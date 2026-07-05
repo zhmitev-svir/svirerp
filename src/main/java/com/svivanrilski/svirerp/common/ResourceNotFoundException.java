@@ -1,4 +1,4 @@
-package org.svir.svirerp.common;
+package com.svivanrilski.svirerp.common;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.ResponseStatus;

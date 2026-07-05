@@ -1,4 +1,4 @@
-package org.svir.svirerp.organization;
+package com.svivanrilski.svirerp.organization;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

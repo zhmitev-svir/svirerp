@@ -1,17 +1,17 @@
-package org.svir.svirerp.volunteer;
+package com.svivanrilski.svirerp.volunteer;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.svir.svirerp.common.ResourceNotFoundException;
-import org.svir.svirerp.event.CalendarEvent;
-import org.svir.svirerp.event.CalendarEventRepository;
-import org.svir.svirerp.organization.Organization;
-import org.svir.svirerp.organization.OrganizationService;
-import org.svir.svirerp.person.Person;
-import org.svir.svirerp.person.PersonService;
+import com.svivanrilski.svirerp.common.ResourceNotFoundException;
+import com.svivanrilski.svirerp.event.CalendarEvent;
+import com.svivanrilski.svirerp.event.CalendarEventRepository;
+import com.svivanrilski.svirerp.organization.Organization;
+import com.svivanrilski.svirerp.organization.OrganizationService;
+import com.svivanrilski.svirerp.person.Person;
+import com.svivanrilski.svirerp.person.PersonService;
 
 import java.math.BigDecimal;
 import java.util.Set;

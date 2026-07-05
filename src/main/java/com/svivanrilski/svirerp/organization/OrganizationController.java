@@ -1,4 +1,4 @@
-package org.svir.svirerp.organization;
+package com.svivanrilski.svirerp.organization;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;

@@ -1,11 +1,11 @@
-package org.svir.svirerp.event;
+package com.svivanrilski.svirerp.event;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import org.svir.svirerp.organization.Organization;
-import org.svir.svirerp.person.Person;
+import com.svivanrilski.svirerp.organization.Organization;
+import com.svivanrilski.svirerp.person.Person;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;

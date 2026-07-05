@@ -1,11 +1,11 @@
-package org.svir.svirerp.finance;
+package com.svivanrilski.svirerp.finance;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import org.svir.svirerp.organization.Organization;
+import com.svivanrilski.svirerp.organization.Organization;
 
 import java.time.OffsetDateTime;
 import java.util.ArrayList;

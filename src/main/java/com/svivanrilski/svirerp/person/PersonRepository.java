@@ -1,4 +1,4 @@
-package org.svir.svirerp.person;
+package com.svivanrilski.svirerp.person;
 
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;

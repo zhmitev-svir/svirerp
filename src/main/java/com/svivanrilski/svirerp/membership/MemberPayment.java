@@ -1,4 +1,4 @@
-package org.svir.svirerp.membership;
+package com.svivanrilski.svirerp.membership;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;

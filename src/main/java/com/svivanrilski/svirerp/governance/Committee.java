@@ -1,10 +1,10 @@
-package org.svir.svirerp.governance;
+package com.svivanrilski.svirerp.governance;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.*;
-import org.svir.svirerp.organization.Organization;
+import com.svivanrilski.svirerp.organization.Organization;
 
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
