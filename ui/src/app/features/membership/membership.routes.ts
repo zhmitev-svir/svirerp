@@ -8,7 +8,7 @@ export const membershipRoutes: Routes = [
         m => m.MembershipShellComponent,
       ),
     children: [
-      { path: '', redirectTo: 'types', pathMatch: 'full' },
+      { path: '', redirectTo: 'members', pathMatch: 'full' },
       {
         path: 'types',
         loadComponent: () =>
