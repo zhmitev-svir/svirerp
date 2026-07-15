@@ -30,11 +30,6 @@ export const appRoutes: Routes = [
           import('./features/persons/persons.routes').then(m => m.personsRoutes),
       },
       {
-        path: 'organizations',
-        loadChildren: () =>
-          import('./features/organizations/organizations.routes').then(m => m.organizationsRoutes),
-      },
-      {
         path: 'membership',
         loadChildren: () =>
           import('./features/membership/membership.routes').then(m => m.membershipRoutes),

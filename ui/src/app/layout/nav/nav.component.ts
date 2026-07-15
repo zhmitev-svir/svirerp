@@ -42,7 +42,6 @@ export class NavComponent {
   private readonly baseNavItems: NavItem[] = [
     { label: 'Dashboard',      icon: 'dashboard',           route: '/dashboard' },
     { label: 'Persons',        icon: 'people',              route: '/persons' },
-    { label: 'Organizations',  icon: 'business',            route: '/organizations' },
     { label: 'Membership',     icon: 'card_membership',     route: '/membership' },
     { label: 'Governance',     icon: 'gavel',               route: '/governance' },
     { label: 'Volunteers',     icon: 'volunteer_activism',  route: '/volunteers' },
