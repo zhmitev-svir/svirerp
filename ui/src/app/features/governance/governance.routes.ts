@@ -4,8 +4,18 @@ export const governanceRoutes: Routes = [
   {
     path: '',
     loadComponent: () =>
-      import('./pages/governance-home/governance-home.component').then(
-        m => m.GovernanceHomeComponent,
+      import('./pages/governance-shell/governance-shell.component').then(
+        m => m.GovernanceShellComponent,
       ),
+    children: [
+      { path: '', redirectTo: 'trustees', pathMatch: 'full' },
+      {
+        path: 'trustees',
+        loadComponent: () =>
+          import('./pages/trustee-list/trustee-list.component').then(
+            m => m.TrusteeListComponent,
+          ),
+      },
+    ],
   },
 ];

@@ -360,7 +360,7 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | Members | `GET /api/organizations/{id}/members` | `POST/PUT /api/members[/{id}]`, `DELETE`, `GET .../expired` |
 | Member CSV import | `GET /api/organizations/{id}/members/import-template` | `POST .../members/import` (multipart CSV, best-effort per-row) |
 | Member payments | `GET/POST /api/member-payments` | |
-| Trustees | `GET/POST /api/trustees` | |
+| Trustees | `GET /api/organizations/{id}/trustees` | `POST/PUT /api/trustees[/{id}]`, `DELETE`, `POST .../{id}/renew` (re-elects for a fresh 2-year term) |
 | Committees | `GET/POST /api/committees` | |
 | Calendar events | `GET/POST /api/organizations/{id}/events` | `?from=&to=` date filter |
 | Volunteers | `GET/POST /api/volunteers` | |

@@ -11,6 +11,7 @@ import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.Person;
 import com.svivanrilski.svirerp.person.PersonService;
 
+import java.time.LocalDate;
 import java.util.Set;
 import java.util.UUID;
 
@@ -18,6 +19,9 @@ import java.util.UUID;
 @Transactional(readOnly = true)
 @RequiredArgsConstructor
 public class GovernanceService {
+
+    // Default term length used when renewing a lapsed trustee term.
+    private static final int TRUSTEE_TERM_YEARS = 2;
 
     private static final Set<String> MEETING_TYPES = Set.of("regular", "special", "emergency", "annual");
     private static final Set<String> MEETING_STATUSES = Set.of("scheduled", "completed", "cancelled", "postponed");
@@ -69,6 +73,21 @@ public class GovernanceService {
     public void deleteTrustee(UUID id) {
         if (!trusteeRepo.existsById(id)) throw new ResourceNotFoundException("Trustee", id);
         trusteeRepo.deleteById(id);
+    }
+
+    /**
+     * Re-elects the same trustee for a fresh term, rather than letting
+     * term_end silently drift forward — a lapsed term auto-renews in the
+     * sense that the trustee keeps serving, but bumping the dates is always
+     * an explicit action tied to an actual election.
+     */
+    @Transactional
+    public Trustee renewTrustee(UUID id) {
+        Trustee existing = findTrusteeById(id);
+        LocalDate today = LocalDate.now();
+        existing.setTermStart(today);
+        existing.setTermEnd(today.plusYears(TRUSTEE_TERM_YEARS));
+        return trusteeRepo.save(existing);
     }
 
     // ── TrusteeDocument ──────────────────────────────────────────────────────

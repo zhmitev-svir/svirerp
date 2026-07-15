@@ -44,6 +44,11 @@ public class GovernanceController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/api/trustees/{id}/renew")
+    public Trustee renewTrustee(@PathVariable UUID id) {
+        return service.renewTrustee(id);
+    }
+
     // ── TrusteeDocument ──────────────────────────────────────────────────────
 
     @GetMapping("/api/trustees/{trusteeId}/documents")

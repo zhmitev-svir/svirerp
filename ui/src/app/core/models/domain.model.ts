@@ -81,21 +81,25 @@ export interface MemberPayment {
 // ─── Governance ─────────────────────────────────────────────────────────────
 export interface Trustee {
   id: string;
-  personId: string;
-  orgId: string;
+  person: Person;
+  org: Organization;
   title?: string;
-  role?: string;
-  termStart?: string;
+  role: string;
+  termStart: string;
   termEnd?: string;
-  isActive?: boolean;
+  isActive: boolean;
+  isOfficer: boolean;
+  notes?: string;
+  createdAt?: string;
 }
 
 export interface TrusteeDocument {
   id: string;
-  trusteeId: string;
-  documentType?: string;
-  filePath?: string;
+  trustee: Trustee;
+  documentType: string;
+  fileUrl: string;
   uploadedAt?: string;
+  notes?: string;
 }
 
 export interface Committee {
