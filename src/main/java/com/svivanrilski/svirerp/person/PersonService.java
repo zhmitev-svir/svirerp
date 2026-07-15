@@ -7,6 +7,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.svivanrilski.svirerp.common.ResourceNotFoundException;
 
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -28,6 +29,11 @@ public class PersonService {
     public Person findByEmail(String email) {
         return repo.findByEmail(email)
                 .orElseThrow(() -> new ResourceNotFoundException("Person not found with email: " + email));
+    }
+
+    /** Non-throwing lookup, for find-or-create flows (e.g. bulk member import). */
+    public Optional<Person> findByEmailIfExists(String email) {
+        return repo.findByEmail(email);
     }
 
     @Transactional

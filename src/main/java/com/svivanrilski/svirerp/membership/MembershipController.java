@@ -4,9 +4,13 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.UUID;
@@ -16,6 +20,7 @@ import java.util.UUID;
 public class MembershipController {
 
     private final MembershipService service;
+    private final MemberImportService importService;
 
     // ── MembershipType ──────────────────────────────────────────────────────
 
@@ -50,6 +55,24 @@ public class MembershipController {
     @GetMapping("/api/organizations/{orgId}/members")
     public Page<Member> listMembers(@PathVariable UUID orgId, Pageable pageable) {
         return service.findAllMembers(orgId, pageable);
+    }
+
+    @GetMapping("/api/organizations/{orgId}/members/import-template")
+    public ResponseEntity<byte[]> importTemplate(@PathVariable UUID orgId) {
+        byte[] csv = importService.buildImportTemplateCsv();
+        return ResponseEntity.ok()
+                .contentType(MediaType.parseMediaType("text/csv"))
+                .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment()
+                        .filename("member-import-template.csv")
+                        .build()
+                        .toString())
+                .body(csv);
+    }
+
+    @PostMapping("/api/organizations/{orgId}/members/import")
+    public MemberImportService.MemberImportResult importMembers(
+            @PathVariable UUID orgId, @RequestParam("file") MultipartFile file) {
+        return importService.importMembers(orgId, file);
     }
 
     @GetMapping("/api/members/{id}")

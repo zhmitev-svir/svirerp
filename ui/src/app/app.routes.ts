@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { ShellComponent } from './layout/shell/shell.component';
 import { authGuard } from './core/guards/auth.guard';
+import { adminGuard } from './core/guards/admin.guard';
 
 export const appRoutes: Routes = [
   {
@@ -57,6 +58,12 @@ export const appRoutes: Routes = [
         path: 'finance',
         loadChildren: () =>
           import('./features/finance/finance.routes').then(m => m.financeRoutes),
+      },
+      {
+        path: 'settings',
+        canActivate: [adminGuard],
+        loadChildren: () =>
+          import('./features/settings/settings.routes').then(m => m.settingsRoutes),
       },
     ],
   },

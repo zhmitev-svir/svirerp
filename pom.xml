@@ -74,6 +74,13 @@
             <scope>runtime</scope>
         </dependency>
 
+        <!-- RFC 4180-compliant CSV read/write for the member import/export template -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>1.12.0</version>
+        </dependency>
+
         <!-- Lombok: reduces entity/DTO boilerplate (@Getter, @Builder, etc.) -->
         <dependency>
             <groupId>org.projectlombok</groupId>

@@ -1,7 +1,8 @@
-import { Component, output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, inject, output, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
+import { AuthService } from '../../core/services/auth.service';
 
 interface NavItem {
   label: string;
@@ -16,7 +17,7 @@ interface NavItem {
   imports: [RouterLink, RouterLinkActive, MatListModule, MatIconModule],
   template: `
     <mat-nav-list class="nav-list">
-      @for (item of navItems; track item.route) {
+      @for (item of navItems(); track item.route) {
         <a mat-list-item
            [routerLink]="item.route"
            routerLinkActive="nav-active"
@@ -34,9 +35,11 @@ interface NavItem {
   `],
 })
 export class NavComponent {
+  private auth = inject(AuthService);
+
   navigate = output<void>();
 
-  readonly navItems: NavItem[] = [
+  private readonly baseNavItems: NavItem[] = [
     { label: 'Dashboard',      icon: 'dashboard',           route: '/dashboard' },
     { label: 'Persons',        icon: 'people',              route: '/persons' },
     { label: 'Organizations',  icon: 'business',            route: '/organizations' },
@@ -46,4 +49,12 @@ export class NavComponent {
     { label: 'Events',         icon: 'event',               route: '/events' },
     { label: 'Finance',        icon: 'account_balance',     route: '/finance' },
   ];
+
+  // Settings is admin-only — never shown to Google-authenticated users, even
+  // though both pass authGuard (see core/guards/admin.guard.ts).
+  readonly navItems = computed<NavItem[]>(() =>
+    this.auth.currentUser()?.provider === 'local-admin'
+      ? [...this.baseNavItems, { label: 'Settings', icon: 'settings', route: '/settings' }]
+      : this.baseNavItems,
+  );
 }

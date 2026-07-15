@@ -32,4 +32,7 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
 
     /** A person may hold at most one membership per organisation, regardless of status. */
     boolean existsByPersonIdAndOrgId(UUID personId, UUID orgId);
+
+    @EntityGraph(attributePaths = {"person", "org", "membershipType"})
+    Optional<Member> findByPersonIdAndOrgId(UUID personId, UUID orgId);
 }

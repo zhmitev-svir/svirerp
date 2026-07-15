@@ -13,6 +13,7 @@ import com.svivanrilski.svirerp.person.PersonService;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -125,6 +126,63 @@ public class MembershipService {
     public void deleteMember(UUID id) {
         if (!memberRepo.existsById(id)) throw new ResourceNotFoundException("Member", id);
         memberRepo.deleteById(id);
+    }
+
+    public enum ImportOutcome { CREATED, UPDATED }
+
+    /**
+     * Called once per CSV row by MemberImportService — deliberately a separate
+     * bean-to-bean call (not a loop within this same class) so each row gets its
+     * own transaction. Without that, a DB-level failure partway through a big
+     * multi-row transaction can mark the whole thing rollback-only, silently
+     * discarding otherwise-successful rows despite catching the exception.
+     */
+    @Transactional
+    public ImportOutcome importOrUpdateMemberFromRow(UUID orgId, MemberImportRow row) {
+        validateMemberStatus(row.status());
+        Organization org = orgService.findById(orgId);
+
+        MembershipType type = typeRepo.findByOrgIdAndNameIgnoreCase(orgId, row.membershipTypeName())
+                .orElseThrow(() -> new IllegalArgumentException("Unknown membership type: " + row.membershipTypeName()));
+
+        Person person = personService.findByEmailIfExists(row.email())
+                .orElseGet(() -> personService.create(Person.builder()
+                        .firstName(row.firstName())
+                        .lastName(row.lastName())
+                        .email(row.email())
+                        .phone(row.phone())
+                        .addressLine1(row.addressLine1())
+                        .city(row.city())
+                        .state(row.state())
+                        .zip(row.zip())
+                        .dateOfBirth(row.dateOfBirth())
+                        .build()));
+
+        Optional<Member> existing = memberRepo.findByPersonIdAndOrgId(person.getId(), orgId);
+        if (existing.isPresent()) {
+            Member member = existing.get();
+            member.setMembershipType(type);
+            member.setMemberNumber(row.memberNumber());
+            member.setJoinDate(row.joinDate());
+            member.setExpiryDate(row.expiryDate());
+            member.setStatus(row.status() != null ? row.status() : member.getStatus());
+            member.setEmailOptIn(row.emailOptIn() != null ? row.emailOptIn() : member.getEmailOptIn());
+            memberRepo.save(member);
+            return ImportOutcome.UPDATED;
+        }
+
+        Member member = Member.builder()
+                .person(person)
+                .org(org)
+                .membershipType(type)
+                .memberNumber(row.memberNumber())
+                .joinDate(row.joinDate())
+                .expiryDate(row.expiryDate())
+                .status(row.status() != null ? row.status() : "active")
+                .emailOptIn(row.emailOptIn() != null ? row.emailOptIn() : true)
+                .build();
+        memberRepo.save(member);
+        return ImportOutcome.CREATED;
     }
 
     // ── MemberPayment ────────────────────────────────────────────────────────

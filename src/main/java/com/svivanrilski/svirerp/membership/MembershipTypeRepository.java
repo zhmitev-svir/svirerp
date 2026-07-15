@@ -23,4 +23,8 @@ public interface MembershipTypeRepository extends JpaRepository<MembershipType, 
     Page<MembershipType> findByOrgId(UUID orgId, Pageable pageable);
 
     Page<MembershipType> findByOrgIdAndIsActive(UUID orgId, boolean isActive, Pageable pageable);
+
+    /** Resolves the human-readable name used in the member import template to an actual type. */
+    @EntityGraph(attributePaths = "org")
+    Optional<MembershipType> findByOrgIdAndNameIgnoreCase(UUID orgId, String name);
 }

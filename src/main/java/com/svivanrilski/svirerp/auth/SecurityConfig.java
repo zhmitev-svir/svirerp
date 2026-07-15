@@ -1,5 +1,6 @@
 package com.svivanrilski.svirerp.auth;
 
+import com.svivanrilski.svirerp.settings.AppSettingService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -10,6 +11,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.LockedException;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
+import org.springframework.security.oauth2.client.registration.ClientRegistration;
+import org.springframework.security.oauth2.client.registration.ClientRegistrationRepository;
+import org.springframework.security.oauth2.core.AuthorizationGrantType;
+import org.springframework.security.oauth2.core.ClientAuthenticationMethod;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.www.BasicAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
@@ -35,11 +40,56 @@ public class SecurityConfig {
     private final GoogleHostedDomainOidcUserService googleHostedDomainOidcUserService;
     private final JsonAuthenticationEntryPoint jsonAuthenticationEntryPoint;
     private final LocalAdminSecurityConfig localAdminSecurityConfig;
+    private final AppSettingService settingService;
+
+    /**
+     * Resolved fresh on every OAuth2 login attempt rather than built once at
+     * startup — Google's client-id/secret are configured at runtime via the
+     * admin-only Settings page (app_setting table), not application.properties,
+     * so a rotated secret takes effect immediately with no restart. Providing
+     * this bean explicitly means Spring Boot's own property-based OAuth2 client
+     * auto-configuration backs off (@ConditionalOnMissingBean) — there must be
+     * zero spring.security.oauth2.client.registration.* properties left for
+     * that to work cleanly (see application.properties).
+     */
+    @Bean
+    public ClientRegistrationRepository clientRegistrationRepository() {
+        return registrationId -> {
+            if (!"google".equals(registrationId)) {
+                return null;
+            }
+            String clientId = settingService.getDecryptedValue("google.oauth.client-id").orElse(null);
+            String clientSecret = settingService.getDecryptedValue("google.oauth.client-secret").orElse(null);
+            if (clientId == null || clientSecret == null) {
+                return null;
+            }
+            // CommonOAuth2Provider.GOOGLE (the usual shortcut for these well-known
+            // endpoints) was removed from this Spring Security version's public
+            // API, so the same stable, publicly-documented Google OIDC endpoints
+            // are declared explicitly here instead.
+            return ClientRegistration.withRegistrationId("google")
+                    .clientId(clientId)
+                    .clientSecret(clientSecret)
+                    .clientAuthenticationMethod(ClientAuthenticationMethod.CLIENT_SECRET_BASIC)
+                    .authorizationGrantType(AuthorizationGrantType.AUTHORIZATION_CODE)
+                    .redirectUri("{baseUrl}/login/oauth2/code/{registrationId}")
+                    .scope("openid", "email", "profile")
+                    .authorizationUri("https://accounts.google.com/o/oauth2/v2/auth")
+                    .tokenUri("https://www.googleapis.com/oauth2/v4/token")
+                    .userInfoUri("https://www.googleapis.com/oauth2/v3/userinfo")
+                    .userNameAttributeName("sub")
+                    .jwkSetUri("https://www.googleapis.com/oauth2/v3/certs")
+                    .issuerUri("https://accounts.google.com")
+                    .clientName("Google")
+                    .build();
+        };
+    }
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
         http
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/settings/**").hasRole("ADMIN")
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())
                 .oauth2Login(oauth2 -> oauth2
