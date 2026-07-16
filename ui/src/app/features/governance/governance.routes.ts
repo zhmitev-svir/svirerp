@@ -16,6 +16,20 @@ export const governanceRoutes: Routes = [
             m => m.TrusteeListComponent,
           ),
       },
+      {
+        path: 'meeting-minutes',
+        loadComponent: () =>
+          import('./pages/meeting-minutes-list/meeting-minutes-list.component').then(
+            m => m.MeetingMinutesListComponent,
+          ),
+      },
+      {
+        path: 'meeting-minutes/:id',
+        loadComponent: () =>
+          import('./pages/meeting-minutes-detail/meeting-minutes-detail.component').then(
+            m => m.MeetingMinutesDetailComponent,
+          ),
+      },
     ],
   },
 ];

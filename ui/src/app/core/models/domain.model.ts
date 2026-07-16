@@ -130,6 +130,29 @@ export interface CommitteeResolution {
   votedAt?: string;
 }
 
+// General board/trustee meeting record — org-level, not tied to a committee.
+export interface MeetingMinutes {
+  id: string;
+  org: Organization;
+  meetingDate: string;
+  title: string;
+  summary?: string;
+  createdAt?: string;
+}
+
+export interface ActionItem {
+  id: string;
+  meetingMinutes: MeetingMinutes;
+  assigneeTrustee?: Trustee;
+  note: string;
+  priority: 'high' | 'normal' | 'low';
+  dueDate?: string;
+  status: 'new' | 'planned' | 'done';
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // ─── Events ─────────────────────────────────────────────────────────────────
 export interface CalendarEvent {
   id: string;

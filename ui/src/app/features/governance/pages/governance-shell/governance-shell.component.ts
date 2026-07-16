@@ -13,6 +13,10 @@ import { MatTabsModule } from '@angular/material/tabs';
          [active]="trusteesActive.isActive">
         Trustees
       </a>
+      <a mat-tab-link routerLink="meeting-minutes" routerLinkActive #meetingMinutesActive="routerLinkActive"
+         [active]="meetingMinutesActive.isActive">
+        Meeting Minutes
+      </a>
     </nav>
     <mat-tab-nav-panel #tabPanel>
       <router-outlet />

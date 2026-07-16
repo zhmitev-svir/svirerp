@@ -12,6 +12,7 @@ import com.svivanrilski.svirerp.person.Person;
 import com.svivanrilski.svirerp.person.PersonService;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
@@ -26,6 +27,8 @@ public class GovernanceService {
     private static final Set<String> MEETING_TYPES = Set.of("regular", "special", "emergency", "annual");
     private static final Set<String> MEETING_STATUSES = Set.of("scheduled", "completed", "cancelled", "postponed");
     private static final Set<String> RESOLUTION_STATUSES = Set.of("passed", "failed", "tabled", "withdrawn");
+    private static final Set<String> ACTION_ITEM_PRIORITIES = Set.of("high", "normal", "low");
+    private static final Set<String> ACTION_ITEM_STATUSES = Set.of("new", "planned", "done");
 
     private final TrusteeRepository trusteeRepo;
     private final TrusteeDocumentRepository trusteeDocRepo;
@@ -33,6 +36,8 @@ public class GovernanceService {
     private final CommitteeMemberRepository committeeMemberRepo;
     private final CommitteeMeetingRepository meetingRepo;
     private final CommitteeResolutionRepository resolutionRepo;
+    private final MeetingMinutesRepository meetingMinutesRepo;
+    private final ActionItemRepository actionItemRepo;
     private final OrganizationService orgService;
     private final PersonService personService;
 
@@ -284,6 +289,84 @@ public class GovernanceService {
         resolutionRepo.deleteById(id);
     }
 
+    // ── MeetingMinutes ───────────────────────────────────────────────────────
+
+    public Page<MeetingMinutes> findMeetingMinutesByOrg(UUID orgId, Pageable pageable) {
+        return meetingMinutesRepo.findByOrgId(orgId, pageable);
+    }
+
+    public MeetingMinutes findMeetingMinutesById(UUID id) {
+        return meetingMinutesRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("MeetingMinutes", id));
+    }
+
+    @Transactional
+    public MeetingMinutes createMeetingMinutes(MeetingMinutes minutes) {
+        Organization org = orgService.findById(minutes.getOrg().getId());
+        minutes.setOrg(org);
+        return meetingMinutesRepo.save(minutes);
+    }
+
+    @Transactional
+    public MeetingMinutes updateMeetingMinutes(UUID id, MeetingMinutes patch) {
+        MeetingMinutes existing = findMeetingMinutesById(id);
+        existing.setMeetingDate(patch.getMeetingDate());
+        existing.setTitle(patch.getTitle());
+        existing.setSummary(patch.getSummary());
+        return meetingMinutesRepo.save(existing);
+    }
+
+    @Transactional
+    public void deleteMeetingMinutes(UUID id) {
+        if (!meetingMinutesRepo.existsById(id)) throw new ResourceNotFoundException("MeetingMinutes", id);
+        meetingMinutesRepo.deleteById(id);
+    }
+
+    // ── ActionItem ────────────────────────────────────────────────────────────
+
+    public List<ActionItem> findActionItemsByMeeting(UUID meetingMinutesId) {
+        return actionItemRepo.findByMeetingMinutesIdOrderByCreatedAt(meetingMinutesId);
+    }
+
+    public ActionItem findActionItemById(UUID id) {
+        return actionItemRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ActionItem", id));
+    }
+
+    @Transactional
+    public ActionItem createActionItem(ActionItem item) {
+        validateActionItemPriority(item.getPriority());
+        validateActionItemStatus(item.getStatus());
+        MeetingMinutes minutes = findMeetingMinutesById(item.getMeetingMinutes().getId());
+        item.setMeetingMinutes(minutes);
+        if (item.getAssigneeTrustee() != null) {
+            item.setAssigneeTrustee(findTrusteeById(item.getAssigneeTrustee().getId()));
+        }
+        return actionItemRepo.save(item);
+    }
+
+    @Transactional
+    public ActionItem updateActionItem(UUID id, ActionItem patch) {
+        validateActionItemPriority(patch.getPriority());
+        validateActionItemStatus(patch.getStatus());
+        ActionItem existing = findActionItemById(id);
+        existing.setNote(patch.getNote());
+        existing.setAssigneeTrustee(patch.getAssigneeTrustee() != null
+                ? findTrusteeById(patch.getAssigneeTrustee().getId())
+                : null);
+        existing.setPriority(patch.getPriority());
+        existing.setDueDate(patch.getDueDate());
+        existing.setStatus(patch.getStatus());
+        existing.setNotes(patch.getNotes());
+        return actionItemRepo.save(existing);
+    }
+
+    @Transactional
+    public void deleteActionItem(UUID id) {
+        if (!actionItemRepo.existsById(id)) throw new ResourceNotFoundException("ActionItem", id);
+        actionItemRepo.deleteById(id);
+    }
+
     // ── Validators ────────────────────────────────────────────────────────────
 
     private void validateMeetingType(String type) {
@@ -299,5 +382,15 @@ public class GovernanceService {
     private void validateResolutionStatus(String status) {
         if (status != null && !RESOLUTION_STATUSES.contains(status))
             throw new IllegalArgumentException("Invalid resolution status: " + status + ". Allowed: " + RESOLUTION_STATUSES);
+    }
+
+    private void validateActionItemPriority(String priority) {
+        if (priority != null && !ACTION_ITEM_PRIORITIES.contains(priority))
+            throw new IllegalArgumentException("Invalid action item priority: " + priority + ". Allowed: " + ACTION_ITEM_PRIORITIES);
+    }
+
+    private void validateActionItemStatus(String status) {
+        if (status != null && !ACTION_ITEM_STATUSES.contains(status))
+            throw new IllegalArgumentException("Invalid action item status: " + status + ". Allowed: " + ACTION_ITEM_STATUSES);
     }
 }

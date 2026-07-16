@@ -52,7 +52,7 @@ svirerp/
 │       └── resources/
 │           ├── application.properties              # Base config (env-var placeholders)
 │           ├── application-local.properties.example  # Copy & fill for local dev
-│           └── db/migration/                       # Flyway V1–V28 SQL scripts
+│           └── db/migration/                       # Flyway V1–V30 SQL scripts
 ├── ui/                          # Angular 21 front-end (see Angular UI section)
 ├── mvnw                         # Unix Maven Wrapper
 ├── mvnw.cmd                     # Windows Maven Wrapper
@@ -72,7 +72,7 @@ cp src/main/resources/application-local.properties.example \
    src/main/resources/application-local.properties
 # Edit application-local.properties with your MySQL user/password
 
-# 3. Run Flyway migrations (creates all 28 tables)
+# 3. Run Flyway migrations (creates all 30 tables)
 ./mvnw flyway:migrate \
   -Dflyway.url="jdbc:mysql://localhost:3306/svirerp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true" \
   -Dflyway.user=root \
@@ -291,10 +291,10 @@ The Flyway Maven plugin lets you apply or inspect migrations without starting th
 
 ### Adding a new migration
 
-1. Create `src/main/resources/db/migration/V29__your_description.sql`
+1. Create `src/main/resources/db/migration/V31__your_description.sql`
 2. Write your `ALTER TABLE` / `CREATE TABLE` / etc.
 3. Update the corresponding JPA entity
-4. Restart the app (or run `./mvnw flyway:migrate`) — Flyway applies V29 automatically
+4. Restart the app (or run `./mvnw flyway:migrate`) — Flyway applies V31 automatically
 
 > **Never edit an already-applied migration.** Flyway validates checksums and will refuse to start if a committed script has changed.
 
@@ -362,6 +362,8 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | Member payments | `GET/POST /api/member-payments` | |
 | Trustees | `GET /api/organizations/{id}/trustees` | `POST/PUT /api/trustees[/{id}]`, `DELETE`, `POST .../{id}/renew` (re-elects for a fresh 2-year term) |
 | Committees | `GET/POST /api/committees` | |
+| Meeting minutes | `GET /api/organizations/{id}/meeting-minutes` | `POST/PUT /api/meeting-minutes[/{id}]`, `DELETE` (cascades to its action items); org-level board/trustee meetings, not tied to a committee |
+| Action items | `GET /api/meeting-minutes/{id}/action-items` | `POST/PUT /api/action-items[/{id}]`, `DELETE`; unpaginated list, optional trustee assignee |
 | Calendar events | `GET/POST /api/organizations/{id}/events` | `?from=&to=` date filter |
 | Volunteers | `GET/POST /api/volunteers` | |
 | Volunteer hours | `GET/POST /api/volunteers/{id}/hours` | `GET …/total-approved` |
@@ -407,3 +409,5 @@ Pagination is available on all list endpoints via `?page=0&size=20&sort=field,as
 | V26 | `reconciliation_item` |
 | V27 | `membership_type` + `can_vote` column |
 | V28 | `app_setting` |
+| V29 | `meeting_minutes` |
+| V30 | `action_item` (nullable FK to `trustee` — assignee is optional) |

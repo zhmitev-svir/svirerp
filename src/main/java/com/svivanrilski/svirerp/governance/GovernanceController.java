@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -186,6 +187,57 @@ public class GovernanceController {
     @DeleteMapping("/api/committee-resolutions/{id}")
     public ResponseEntity<Void> deleteResolution(@PathVariable UUID id) {
         service.deleteResolution(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ── MeetingMinutes ───────────────────────────────────────────────────────
+
+    @GetMapping("/api/organizations/{orgId}/meeting-minutes")
+    public Page<MeetingMinutes> listMeetingMinutes(@PathVariable UUID orgId, Pageable pageable) {
+        return service.findMeetingMinutesByOrg(orgId, pageable);
+    }
+
+    @GetMapping("/api/meeting-minutes/{id}")
+    public MeetingMinutes getMeetingMinutes(@PathVariable UUID id) {
+        return service.findMeetingMinutesById(id);
+    }
+
+    @PostMapping("/api/meeting-minutes")
+    public ResponseEntity<MeetingMinutes> createMeetingMinutes(@Valid @RequestBody MeetingMinutes minutes) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.createMeetingMinutes(minutes));
+    }
+
+    @PutMapping("/api/meeting-minutes/{id}")
+    public MeetingMinutes updateMeetingMinutes(@PathVariable UUID id, @Valid @RequestBody MeetingMinutes minutes) {
+        return service.updateMeetingMinutes(id, minutes);
+    }
+
+    @DeleteMapping("/api/meeting-minutes/{id}")
+    public ResponseEntity<Void> deleteMeetingMinutes(@PathVariable UUID id) {
+        service.deleteMeetingMinutes(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ── ActionItem ────────────────────────────────────────────────────────────
+
+    @GetMapping("/api/meeting-minutes/{meetingMinutesId}/action-items")
+    public List<ActionItem> listActionItems(@PathVariable UUID meetingMinutesId) {
+        return service.findActionItemsByMeeting(meetingMinutesId);
+    }
+
+    @PostMapping("/api/action-items")
+    public ResponseEntity<ActionItem> createActionItem(@Valid @RequestBody ActionItem item) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.createActionItem(item));
+    }
+
+    @PutMapping("/api/action-items/{id}")
+    public ActionItem updateActionItem(@PathVariable UUID id, @Valid @RequestBody ActionItem item) {
+        return service.updateActionItem(id, item);
+    }
+
+    @DeleteMapping("/api/action-items/{id}")
+    public ResponseEntity<Void> deleteActionItem(@PathVariable UUID id) {
+        service.deleteActionItem(id);
         return ResponseEntity.noContent().build();
     }
 }
