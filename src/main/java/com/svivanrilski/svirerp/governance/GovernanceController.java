@@ -4,10 +4,12 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -193,8 +195,11 @@ public class GovernanceController {
     // ── MeetingMinutes ───────────────────────────────────────────────────────
 
     @GetMapping("/api/organizations/{orgId}/meeting-minutes")
-    public Page<MeetingMinutes> listMeetingMinutes(@PathVariable UUID orgId, Pageable pageable) {
-        return service.findMeetingMinutesByOrg(orgId, pageable);
+    public Page<MeetingMinutes> listMeetingMinutes(@PathVariable UUID orgId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            @RequestParam(required = false, defaultValue = "false") boolean openActionItemsOnly,
+            Pageable pageable) {
+        return service.findMeetingMinutesByOrg(orgId, fromDate, openActionItemsOnly, pageable);
     }
 
     @GetMapping("/api/meeting-minutes/{id}")

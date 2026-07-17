@@ -2,6 +2,10 @@ import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@ang
 import { PageEvent } from '@angular/material/paginator';
 import { MatDialog } from '@angular/material/dialog';
 import { Router } from '@angular/router';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { FormsModule } from '@angular/forms';
 
 import { MeetingMinutesService } from '../../services/meeting-minutes.service';
 import { OrgContextService } from '../../../../core/services/org-context.service';
@@ -22,7 +26,7 @@ function excerpt(text: string | undefined, maxLength = 80): string {
   selector: 'app-meeting-minutes-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DataTableComponent, PageHeaderComponent],
+  imports: [DataTableComponent, PageHeaderComponent, MatFormFieldModule, MatInputModule, MatCheckboxModule, FormsModule],
   template: `
     <div class="page-container">
       <app-page-header
@@ -31,6 +35,16 @@ function excerpt(text: string | undefined, maxLength = 80): string {
         actionLabel="Add Meeting Minutes"
         actionIcon="post_add"
         (action)="openForm()" />
+
+      <div class="filter-bar">
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>On or after</mat-label>
+          <input matInput type="date" [(ngModel)]="fromDateFilter" (change)="onFilterChange()" />
+        </mat-form-field>
+        <mat-checkbox [(ngModel)]="openActionItemsOnlyFilter" (change)="onFilterChange()">
+          Has open action items
+        </mat-checkbox>
+      </div>
 
       <app-data-table
         [columns]="columns"
@@ -41,6 +55,10 @@ function excerpt(text: string | undefined, maxLength = 80): string {
         (pageChange)="onPageChange($event)" />
     </div>
   `,
+  styles: [`
+    .filter-bar { display: flex; align-items: center; gap: 20px; margin-bottom: 8px; flex-wrap: wrap; }
+    .filter-field { width: 200px; }
+  `],
 })
 export class MeetingMinutesListComponent implements OnInit {
   private meetingMinutesService = inject(MeetingMinutesService);
@@ -53,6 +71,9 @@ export class MeetingMinutesListComponent implements OnInit {
   page = signal<Page<MeetingMinutes> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
+
+  fromDateFilter: string | null = null;
+  openActionItemsOnlyFilter = false;
 
   readonly columns: TableColumn[] = [
     { key: 'meetingDate', header: 'Date' },
@@ -72,6 +93,11 @@ export class MeetingMinutesListComponent implements OnInit {
 
   onPageChange(event: PageEvent): void {
     this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.loadPage();
+  }
+
+  onFilterChange(): void {
+    this.pageParams.set({ ...this.pageParams(), page: 0 });
     this.loadPage();
   }
 
@@ -111,7 +137,7 @@ export class MeetingMinutesListComponent implements OnInit {
     this.orgContext.ensureOrgId().subscribe({
       next: orgId => {
         this.orgId = orgId;
-        this.meetingMinutesService.getPageForOrg(orgId, this.pageParams()).subscribe({
+        this.meetingMinutesService.getPageForOrg(orgId, this.pageParams(), this.fromDateFilter, this.openActionItemsOnlyFilter).subscribe({
           next: data => { this.page.set(data); this.loading.set(false); },
           error: () => this.loading.set(false),
         });

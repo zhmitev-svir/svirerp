@@ -15,10 +15,21 @@ export class MeetingMinutesService extends ResourceService<MeetingMinutes> {
   }
 
   /** List is org-scoped (unlike get/create/update/delete, which are flat). */
-  getPageForOrg(orgId: string, params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<MeetingMinutes>> {
+  getPageForOrg(
+    orgId: string,
+    params: PageParams = DEFAULT_PAGE_PARAMS,
+    fromDate?: string | null,
+    openActionItemsOnly = false,
+  ): Observable<Page<MeetingMinutes>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
       p = p.set('sort', params.sort);
+    }
+    if (fromDate) {
+      p = p.set('fromDate', fromDate);
+    }
+    if (openActionItemsOnly) {
+      p = p.set('openActionItemsOnly', 'true');
     }
     return this.http.get<Page<MeetingMinutes>>(
       `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/meeting-minutes`,

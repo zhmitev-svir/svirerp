@@ -291,8 +291,12 @@ public class GovernanceService {
 
     // ── MeetingMinutes ───────────────────────────────────────────────────────
 
-    public Page<MeetingMinutes> findMeetingMinutesByOrg(UUID orgId, Pageable pageable) {
-        return meetingMinutesRepo.findByOrgId(orgId, pageable);
+    public Page<MeetingMinutes> findMeetingMinutesByOrg(UUID orgId, LocalDate fromDate,
+            boolean openActionItemsOnly, Pageable pageable) {
+        if (fromDate == null && !openActionItemsOnly) {
+            return meetingMinutesRepo.findByOrgId(orgId, pageable);
+        }
+        return meetingMinutesRepo.search(orgId, fromDate, openActionItemsOnly, pageable);
     }
 
     public MeetingMinutes findMeetingMinutesById(UUID id) {
