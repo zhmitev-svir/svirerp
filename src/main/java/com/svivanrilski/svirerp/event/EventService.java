@@ -31,6 +31,7 @@ public class EventService {
     private final EventResourceRepository resourceRepo;
     private final OrganizationService orgService;
     private final PersonService personService;
+    private final GoogleCalendarService googleCalendarService;
 
     // ── CalendarEvent ─────────────────────────────────────────────────────────
 
@@ -58,7 +59,9 @@ public class EventService {
             Person creator = personService.findById(event.getCreatedBy().getId());
             event.setCreatedBy(creator);
         }
-        return eventRepo.save(event);
+        CalendarEvent saved = eventRepo.save(event);
+        googleCalendarService.syncToGoogle(saved);
+        return eventRepo.save(saved);
     }
 
     @Transactional
@@ -79,12 +82,17 @@ public class EventService {
         existing.setStatus(patch.getStatus());
         existing.setVisibility(patch.getVisibility());
         existing.setCapacity(patch.getCapacity());
-        return eventRepo.save(existing);
+        existing.setPublishToOfficial(patch.getPublishToOfficial());
+        existing.setPublishToInternal(patch.getPublishToInternal());
+        CalendarEvent saved = eventRepo.save(existing);
+        googleCalendarService.syncToGoogle(saved);
+        return eventRepo.save(saved);
     }
 
     @Transactional
     public void deleteEvent(UUID id) {
-        if (!eventRepo.existsById(id)) throw new ResourceNotFoundException("CalendarEvent", id);
+        CalendarEvent existing = findEventById(id);
+        googleCalendarService.deleteFromGoogle(existing);
         eventRepo.deleteById(id);
     }
 

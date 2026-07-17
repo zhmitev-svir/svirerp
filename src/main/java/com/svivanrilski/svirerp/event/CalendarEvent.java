@@ -81,6 +81,28 @@ public class CalendarEvent {
 
     private Integer capacity;
 
+    // One-way push to Google Calendar — see GoogleCalendarService. The
+    // *_event_id columns are set once a push succeeds (needed to target
+    // later updates/deletes at the right Google-side event); *_sync_error
+    // is non-null only when the most recent push attempt failed.
+    @Column(name = "publish_to_official", nullable = false)
+    private Boolean publishToOfficial = false;
+
+    @Column(name = "google_official_event_id", length = 255)
+    private String googleOfficialEventId;
+
+    @Column(name = "google_official_sync_error", columnDefinition = "TEXT")
+    private String googleOfficialSyncError;
+
+    @Column(name = "publish_to_internal", nullable = false)
+    private Boolean publishToInternal = false;
+
+    @Column(name = "google_internal_event_id", length = 255)
+    private String googleInternalEventId;
+
+    @Column(name = "google_internal_sync_error", columnDefinition = "TEXT")
+    private String googleInternalSyncError;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 

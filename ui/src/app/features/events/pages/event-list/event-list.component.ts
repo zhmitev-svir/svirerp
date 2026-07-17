@@ -16,6 +16,14 @@ import { PageHeaderComponent } from '../../../../shared/components/page-header/p
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { EventFormComponent } from '../event-form/event-form.component';
 
+/** Short "is this on the calendars it should be" summary for the list column — full error text is on the edit form and detail page. */
+function calendarSyncSummary(e: CalendarEvent): string {
+  const parts: string[] = [];
+  if (e.publishToOfficial) parts.push(e.googleOfficialSyncError ? 'Official ⚠' : 'Official ✓');
+  if (e.publishToInternal) parts.push(e.googleInternalSyncError ? 'Internal ⚠' : 'Internal ✓');
+  return parts.length ? parts.join(' · ') : '—';
+}
+
 @Component({
   selector: 'app-event-list',
   standalone: true,
@@ -76,6 +84,7 @@ export class EventListComponent implements OnInit {
     { key: 'startDatetime', header: 'Start' },
     { key: 'location', header: 'Location', cell: (e: CalendarEvent) => e.location || '—' },
     { key: 'status', header: 'Status' },
+    { key: 'calendarSync', header: 'Calendar Sync', cell: (e: CalendarEvent) => calendarSyncSummary(e) },
   ];
 
   readonly actions: TableAction[] = [

@@ -30,6 +30,13 @@ export const settingsRoutes: Routes = [
             m => m.GmailSettingsComponent,
           ),
       },
+      {
+        path: 'calendar',
+        loadComponent: () =>
+          import('./pages/calendar-settings/calendar-settings.component').then(
+            m => m.CalendarSettingsComponent,
+          ),
+      },
     ],
   },
 ];

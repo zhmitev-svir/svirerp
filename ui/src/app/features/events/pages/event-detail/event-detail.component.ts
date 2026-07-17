@@ -44,6 +44,23 @@ import { EventResourceFormComponent } from '../event-resource-form/event-resourc
           </mat-card>
         }
 
+        @if (e.googleOfficialSyncError || e.googleInternalSyncError) {
+          <mat-card class="sync-error-card">
+            <mat-card-content>
+              <mat-icon>warning</mat-icon>
+              <div>
+                @if (e.googleOfficialSyncError) {
+                  <p>Official Calendar: {{ e.googleOfficialSyncError }}</p>
+                }
+                @if (e.googleInternalSyncError) {
+                  <p>Internal Calendar: {{ e.googleInternalSyncError }}</p>
+                }
+                <p class="sync-error-hint">Edit and save the event to retry.</p>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        }
+
         <div class="section-header">
           <h2 class="mat-headline-6 section-title">Church Service Details</h2>
           <button mat-stroked-button (click)="openChurchForm()">
@@ -98,6 +115,11 @@ import { EventResourceFormComponent } from '../event-resource-form/event-resourc
   `,
   styles: [`
     .summary-card, .church-card { margin-bottom: 16px; white-space: pre-wrap; }
+    .sync-error-card { margin-bottom: 16px; background: #fff8e1; }
+    .sync-error-card mat-card-content { display: flex; gap: 12px; align-items: flex-start; }
+    .sync-error-card mat-icon { color: #f57c00; }
+    .sync-error-card p { margin: 0 0 4px; }
+    .sync-error-hint { color: rgba(0,0,0,.54); font-size: 0.85em; }
     .section-header { display: flex; align-items: center; justify-content: space-between; margin: 16px 0 8px; }
     .section-title { margin: 0; }
     .empty-hint { color: rgba(0,0,0,.54); margin: 0 0 16px; }

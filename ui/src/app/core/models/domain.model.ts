@@ -174,6 +174,12 @@ export interface CalendarEvent {
   status: 'scheduled' | 'cancelled' | 'completed' | 'postponed';
   visibility: 'public' | 'members_only' | 'internal';
   capacity?: number;
+  publishToOfficial?: boolean;
+  googleOfficialEventId?: string;
+  googleOfficialSyncError?: string;
+  publishToInternal?: boolean;
+  googleInternalEventId?: string;
+  googleInternalSyncError?: string;
   createdAt?: string;
 }
 

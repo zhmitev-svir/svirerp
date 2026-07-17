@@ -53,7 +53,7 @@ svirerp/
 │       └── resources/
 │           ├── application.properties              # Base config (env-var placeholders)
 │           ├── application-local.properties.example  # Copy & fill for local dev
-│           └── db/migration/                       # Flyway V1–V34 SQL scripts
+│           └── db/migration/                       # Flyway V1–V35 SQL scripts
 ├── ui/                          # Angular 21 front-end (see Angular UI section)
 ├── mvnw                         # Unix Maven Wrapper
 ├── mvnw.cmd                     # Windows Maven Wrapper
@@ -397,6 +397,7 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | Reconciliations | `GET/POST /api/reconciliations` | |
 | App settings (admin) | `GET /api/settings` | `PUT /api/settings/{key}`; `ROLE_ADMIN` only, `SECRET` values never returned |
 | Gmail (admin) | `GET /api/settings/gmail/authorize-url` | `GET .../callback` (OAuth redirect target), `POST .../test-send`; `ROLE_ADMIN` only — see [Admin Settings](#admin-settings) |
+| Google Calendar (admin) | `GET /api/settings/calendar/authorize-url` | `GET .../callback`, `POST .../test-connection`; `ROLE_ADMIN` only. One-way push only (ERP → Calendar, never the reverse) — see `CalendarEvent.publishToOfficial`/`publishToInternal` and their `google*SyncError` fields |
 
 Pagination is available on all list endpoints via `?page=0&size=20&sort=field,asc`.
 
@@ -440,3 +441,4 @@ Pagination is available on all list endpoints via `?page=0&size=20&sort=field,as
 | V32 | `volunteer.contact_person_id` (nullable FK to `person`, `ON DELETE SET NULL`) |
 | V33 | `volunteer_area` (org-scoped lookup) |
 | V34 | `volunteer_area_assignment` (many-to-many join, `volunteer` ↔ `volunteer_area`) |
+| V35 | `calendar_event.publish_to_official`/`publish_to_internal` + their `google_*_event_id`/`google_*_sync_error` tracking columns; seeds `calendar.*` `app_setting` rows for the Google Calendar OAuth connection |

@@ -130,6 +130,19 @@ const VISIBILITIES = ['public', 'members_only', 'internal'] as const;
           </mat-form-field>
         </div>
 
+        <div class="calendar-row">
+          <mat-checkbox formControlName="publishToOfficial">Publish to Official Calendar</mat-checkbox>
+          @if (entity?.googleOfficialSyncError) {
+            <mat-icon class="sync-warning" [matTooltip]="entity!.googleOfficialSyncError!">warning</mat-icon>
+          }
+        </div>
+        <div class="calendar-row">
+          <mat-checkbox formControlName="publishToInternal">Publish to Internal Calendar</mat-checkbox>
+          @if (entity?.googleInternalSyncError) {
+            <mat-icon class="sync-warning" [matTooltip]="entity!.googleInternalSyncError!">warning</mat-icon>
+          }
+        </div>
+
         <div class="person-row">
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Created By (optional)</mat-label>
@@ -167,6 +180,8 @@ const VISIBILITIES = ['public', 'members_only', 'internal'] as const;
     .flex-1 { flex: 1; }
     .person-row { display: flex; align-items: flex-start; gap: 4px; }
     .person-row .full-width { flex: 1; }
+    .calendar-row { display: flex; align-items: center; gap: 8px; }
+    .sync-warning { color: #f57c00; font-size: 20px; height: 20px; width: 20px; cursor: help; }
   `],
 })
 export class EventFormComponent implements OnInit {
@@ -179,7 +194,7 @@ export class EventFormComponent implements OnInit {
   private data = inject<EventDialogData>(MAT_DIALOG_DATA);
 
   private orgId = this.data.orgId;
-  private entity = this.data.entity;
+  entity = this.data.entity;
   isEdit = !!this.entity;
   saving = signal(false);
 
@@ -201,6 +216,8 @@ export class EventFormComponent implements OnInit {
     recurrenceRule: [''],
     visibility: ['public'],
     capacity: this.fb.control<number | null>(null),
+    publishToOfficial: [false],
+    publishToInternal: [false],
     createdById: this.fb.control<string | null>(null),
   });
 
@@ -224,6 +241,8 @@ export class EventFormComponent implements OnInit {
         recurrenceRule: this.entity.recurrenceRule ?? '',
         visibility: this.entity.visibility,
         capacity: this.entity.capacity ?? null,
+        publishToOfficial: this.entity.publishToOfficial ?? false,
+        publishToInternal: this.entity.publishToInternal ?? false,
         createdById: this.entity.createdBy?.id ?? null,
       });
     }
@@ -264,6 +283,8 @@ export class EventFormComponent implements OnInit {
       recurrenceRule: value.isRecurring ? (value.recurrenceRule || null) : null,
       visibility: value.visibility,
       capacity: value.capacity ?? null,
+      publishToOfficial: value.publishToOfficial,
+      publishToInternal: value.publishToInternal,
     } as unknown as Partial<CalendarEvent>;
 
     const op = this.isEdit
