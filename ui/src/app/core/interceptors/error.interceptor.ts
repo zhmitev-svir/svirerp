@@ -26,6 +26,9 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
       // password — both are expected outcomes handled inline by their own
       // component, not a "session expired, redirect to login" situation.
       const isAuthEndpoint = req.url.endsWith('/auth/me') || req.url.endsWith('/login/local');
+      // Most events have no ChurchEvent row yet — a 404 here just means
+      // "no church details recorded", handled inline by ChurchEventService.
+      const isExpected404 = req.url.includes('/church-details');
 
       if (err.status === 0) {
         notifications.error('Cannot reach the server. Check your connection.');
@@ -38,7 +41,9 @@ export const errorInterceptor: HttpInterceptorFn = (req, next) => {
       } else if (err.status === 409) {
         notifications.error(message);
       } else if (err.status === 404) {
-        notifications.error('Resource not found.');
+        if (!isExpected404) {
+          notifications.error('Resource not found.');
+        }
       } else if (err.status === 400) {
         notifications.error(message);
       }

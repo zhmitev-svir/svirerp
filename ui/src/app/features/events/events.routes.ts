@@ -6,4 +6,9 @@ export const eventsRoutes: Routes = [
     loadComponent: () =>
       import('./pages/event-list/event-list.component').then(m => m.EventListComponent),
   },
+  {
+    path: ':id',
+    loadComponent: () =>
+      import('./pages/event-detail/event-detail.component').then(m => m.EventDetailComponent),
+  },
 ];

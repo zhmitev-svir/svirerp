@@ -384,7 +384,10 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | Committees | `GET/POST /api/committees` | |
 | Meeting minutes | `GET /api/organizations/{id}/meeting-minutes` | `POST/PUT /api/meeting-minutes[/{id}]`, `DELETE` (cascades to its action items); org-level board/trustee meetings, not tied to a committee |
 | Action items | `GET /api/meeting-minutes/{id}/action-items` | `POST/PUT /api/action-items[/{id}]`, `DELETE`; unpaginated list, optional trustee assignee |
-| Calendar events | `GET/POST /api/organizations/{id}/events` | `?from=&to=` date filter |
+| Calendar events | `GET/POST /api/organizations/{id}/events` | `?from=&to=` date filter; `PUT/DELETE /api/events/{id}` (delete cascades to church details/registrations/resources) |
+| Church service details | `GET /api/events/{id}/church-details` | 1:1 with an event, 404 if not recorded; `POST/PUT/DELETE /api/church-events[/{id}]` |
+| Event registrations | `GET /api/events/{id}/registrations` | `POST/PUT/DELETE /api/event-registrations[/{id}]`; at most one registration per (event, person) |
+| Event resources | `GET /api/events/{id}/resources` | `POST/PUT/DELETE /api/event-resources[/{id}]` |
 | Volunteers | `GET/POST /api/volunteers` | `GET /api/organizations/{id}/volunteers` for org-scoped list; supports `contactPerson` + `areas` |
 | Volunteer areas | `GET/POST /api/organizations/{id}/volunteer-areas` | Org-scoped lookup (Construction, Cooking Crew, etc.); lazily seeded with 7 starter areas on first request; `POST /api/volunteer-areas` to add more |
 | Volunteer hours | `GET/POST /api/volunteers/{id}/hours` | `GET …/total-approved` |

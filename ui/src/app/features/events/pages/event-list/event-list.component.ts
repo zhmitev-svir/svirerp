@@ -1,34 +1,152 @@
-import { Component, ChangeDetectionStrategy } from '@angular/core';
-import { MatCardModule } from '@angular/material/card';
-import { MatIconModule } from '@angular/material/icon';
+import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
+import { PageEvent } from '@angular/material/paginator';
+import { MatDialog } from '@angular/material/dialog';
+import { Router } from '@angular/router';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatInputModule } from '@angular/material/input';
+import { FormsModule } from '@angular/forms';
+
+import { EventService } from '../../services/event.service';
+import { OrgContextService } from '../../../../core/services/org-context.service';
+import { NotificationService } from '../../../../core/services/notification.service';
+import { CalendarEvent } from '../../../../core/models/domain.model';
+import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
+import { DataTableComponent, TableColumn, TableAction } from '../../../../shared/components/data-table/data-table.component';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
+import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
+import { EventFormComponent } from '../event-form/event-form.component';
 
 @Component({
   selector: 'app-event-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [MatCardModule, MatIconModule, PageHeaderComponent],
+  imports: [DataTableComponent, PageHeaderComponent, MatFormFieldModule, MatInputModule, FormsModule],
   template: `
     <div class="page-container">
       <app-page-header
         title="Events"
-        subtitle="Calendar events and registrations" />
+        subtitle="Calendar events and registrations"
+        actionLabel="Add Event"
+        actionIcon="event"
+        (action)="openForm()" />
 
-      <mat-card class="coming-soon-card">
-        <mat-card-content class="coming-soon-content">
-          <mat-icon class="coming-soon-icon">event</mat-icon>
-          <p class="mat-body-1">
-            Event management will be available in a future iteration.
-            Planned: calendar view, church events, registration management and resource allocation.
-          </p>
-        </mat-card-content>
-      </mat-card>
+      <div class="filter-bar">
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>From</mat-label>
+          <input matInput type="date" [(ngModel)]="fromFilter" (change)="onFilterChange()" />
+        </mat-form-field>
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>To</mat-label>
+          <input matInput type="date" [(ngModel)]="toFilter" (change)="onFilterChange()" />
+        </mat-form-field>
+      </div>
+
+      <app-data-table
+        [columns]="columns"
+        [actions]="actions"
+        [data]="page()"
+        [loading]="loading()"
+        [pageParams]="pageParams()"
+        (pageChange)="onPageChange($event)" />
     </div>
   `,
   styles: [`
-    .coming-soon-card { margin-top: 16px; }
-    .coming-soon-content { display: flex; align-items: center; gap: 16px; padding: 24px !important; }
-    .coming-soon-icon { font-size: 48px; width: 48px; height: 48px; color: rgba(0,0,0,.3); }
+    .filter-bar { display: flex; gap: 12px; margin-bottom: 8px; }
+    .filter-field { width: 200px; }
   `],
 })
-export class EventListComponent {}
+export class EventListComponent implements OnInit {
+  private eventService = inject(EventService);
+  private orgContext = inject(OrgContextService);
+  private dialog = inject(MatDialog);
+  private notifications = inject(NotificationService);
+  private router = inject(Router);
+
+  private orgId: string | null = null;
+  page = signal<Page<CalendarEvent> | null>(null);
+  loading = signal(false);
+  pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
+
+  fromFilter: string | null = null;
+  toFilter: string | null = null;
+
+  readonly columns: TableColumn[] = [
+    { key: 'title', header: 'Title' },
+    { key: 'eventType', header: 'Type', cell: (e: CalendarEvent) => e.eventType || '—' },
+    { key: 'startDatetime', header: 'Start' },
+    { key: 'location', header: 'Location', cell: (e: CalendarEvent) => e.location || '—' },
+    { key: 'status', header: 'Status' },
+  ];
+
+  readonly actions: TableAction[] = [
+    { icon: 'open_in_new', label: 'View', action: (e: CalendarEvent) => this.openDetail(e) },
+    { icon: 'edit', label: 'Edit', action: (e: CalendarEvent) => this.openForm(e) },
+    { icon: 'delete', label: 'Delete', action: (e: CalendarEvent) => this.confirmDelete(e) },
+  ];
+
+  ngOnInit(): void {
+    this.orgContext.ensureOrgId().subscribe({
+      next: orgId => {
+        this.orgId = orgId;
+        this.loadPage();
+      },
+      error: err => this.notifications.error(err.message ?? 'Could not load organization.'),
+    });
+  }
+
+  onPageChange(event: PageEvent): void {
+    this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.loadPage();
+  }
+
+  onFilterChange(): void {
+    this.pageParams.set({ ...this.pageParams(), page: 0 });
+    this.loadPage();
+  }
+
+  openDetail(event: CalendarEvent): void {
+    this.router.navigate(['/events', event.id]);
+  }
+
+  openForm(entity?: CalendarEvent): void {
+    if (!this.orgId) return;
+    this.dialog
+      .open(EventFormComponent, { width: '560px', data: { orgId: this.orgId, entity: entity ?? null } })
+      .afterClosed()
+      .subscribe(saved => { if (saved) this.loadPage(); });
+  }
+
+  confirmDelete(event: CalendarEvent): void {
+    this.dialog
+      .open(ConfirmDialogComponent, {
+        data: {
+          title: 'Delete Event',
+          message: `Delete "${event.title}"? This cannot be undone.`,
+          confirmLabel: 'Delete',
+        },
+      })
+      .afterClosed()
+      .subscribe(confirmed => { if (confirmed) this.deleteEvent(event); });
+  }
+
+  private loadPage(): void {
+    if (!this.orgId) return;
+    this.loading.set(true);
+    // Backend expects `from`/`to` as full ISO datetimes; date inputs give plain dates.
+    const from = this.fromFilter ? `${this.fromFilter}T00:00:00Z` : null;
+    const to = this.toFilter ? `${this.toFilter}T23:59:59Z` : null;
+    this.eventService.getPageForOrg(this.orgId, this.pageParams(), from, to).subscribe({
+      next: data => { this.page.set(data); this.loading.set(false); },
+      error: ()   => this.loading.set(false),
+    });
+  }
+
+  private deleteEvent(event: CalendarEvent): void {
+    this.eventService.remove(event.id).subscribe({
+      next: () => {
+        this.notifications.success('Event deleted.');
+        this.loadPage();
+      },
+    });
+  }
+}

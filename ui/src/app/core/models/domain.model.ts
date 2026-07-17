@@ -159,40 +159,55 @@ export interface ActionItem {
 // ─── Events ─────────────────────────────────────────────────────────────────
 export interface CalendarEvent {
   id: string;
-  orgId: string;
+  org: Organization;
+  createdBy?: Person;
   title: string;
   description?: string;
-  startDate: string;
-  endDate?: string;
-  location?: string;
   eventType?: string;
-  isPublic?: boolean;
-  maxAttendees?: number;
-  createdById?: string;
+  startDatetime: string;
+  endDatetime?: string;
+  isAllDay?: boolean;
+  location?: string;
+  virtualLink?: string;
+  isRecurring?: boolean;
+  recurrenceRule?: string;
+  status: 'scheduled' | 'cancelled' | 'completed' | 'postponed';
+  visibility: 'public' | 'members_only' | 'internal';
+  capacity?: number;
   createdAt?: string;
 }
 
 export interface ChurchEvent {
   id: string;
-  calendarEventId: string;
+  calendarEvent: CalendarEvent;
   serviceType?: string;
-  presider?: string;
+  liturgicalSeason?: string;
+  officiant?: string;
+  sermonTitle?: string;
+  scriptureReadings?: string;
+  musicSelections?: string;
+  specialInstructions?: string;
+  offeringCollected?: number;
+  attendanceCount?: number;
 }
 
 export interface EventRegistration {
   id: string;
-  eventId: string;
-  personId: string;
+  event: CalendarEvent;
+  person: Person;
   registeredAt?: string;
-  status?: string;
+  status: 'registered' | 'attended' | 'cancelled' | 'waitlisted' | 'no_show';
+  feePaid?: number;
+  ticketNumber?: string;
   notes?: string;
 }
 
 export interface EventResource {
   id: string;
-  eventId: string;
+  event: CalendarEvent;
+  resourceType: string;
   resourceName: string;
-  quantity?: number;
+  assignedTo?: string;
   notes?: string;
 }
 
