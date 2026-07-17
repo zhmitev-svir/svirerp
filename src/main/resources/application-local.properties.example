@@ -17,9 +17,8 @@ spring.datasource.password=YOUR_DB_PASSWORD
 # Google OAuth2 client for LOCAL DEVELOPMENT — create a separate dev-only
 # OAuth Client in Google Cloud Console (redirect URI
 # http://localhost:8080/login/oauth2/code/google). Do not reuse the
-# production client's secret here.
-spring.security.oauth2.client.registration.google.client-id=GOOGLE_CLIENT_ID
-spring.security.oauth2.client.registration.google.client-secret=GOOGLE_CLIENT_ID
+# production client's secret here. No longer a property — log in as the
+# local admin below and set these on the Settings page instead.
 
 # Break-glass local admin login — leave blank to disable. Generate the hash
 # once via a throwaway `new BCryptPasswordEncoder().encode("your-password")`
@@ -27,3 +26,10 @@ spring.security.oauth2.client.registration.google.client-secret=GOOGLE_CLIENT_ID
 
 app.auth.admin.username = ADMIN_USER_NAME
 app.auth.admin.password-hash = ADMIN_PASSWORD_HASH
+
+# Encrypts SECRET-type rows in the app_setting table (e.g. the Google OAuth
+# client secret above). Salt must be hex-encoded. Losing either value
+# permanently strands any already-encrypted settings — see
+# application.properties for details.
+app.settings.encryption-key = YOUR_LOCAL_DEV_ENCRYPTION_KEY
+app.settings.encryption-salt = deadbeef00112233

@@ -15,7 +15,7 @@
         <relativePath/>
     </parent>
 
-    <groupId>org.svir</groupId>
+    <groupId>com.svivanrilski</groupId>
     <artifactId>svirerp</artifactId>
     <version>1.0.0-SNAPSHOT</version>
     <packaging>jar</packaging>
@@ -56,6 +56,14 @@
             <artifactId>spring-boot-starter-oauth2-client</artifactId>
         </dependency>
 
+        <!-- jakarta.mail MimeMessage/MimeMessageHelper only, to build well-formed RFC 822
+             messages in memory for the Gmail API (see the email package) — delivery goes
+             over HTTPS to Gmail, never SMTP, so no mail-server connectivity is opened. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Schema migrations: Flyway owns all DDL; JPA is set to validate-only.
              MySQL support is included in flyway-core; no separate DB module required. -->
         <dependency>
@@ -72,6 +80,13 @@
             <groupId>com.mysql</groupId>
             <artifactId>mysql-connector-j</artifactId>
             <scope>runtime</scope>
+        </dependency>
+
+        <!-- RFC 4180-compliant CSV read/write for the member import/export template -->
+        <dependency>
+            <groupId>org.apache.commons</groupId>
+            <artifactId>commons-csv</artifactId>
+            <version>1.12.0</version>
         </dependency>
 
         <!-- Lombok: reduces entity/DTO boilerplate (@Getter, @Builder, etc.) -->
