@@ -27,5 +27,8 @@ public interface VolunteerRepository extends JpaRepository<Volunteer, UUID> {
     @EntityGraph(attributePaths = {"person", "org", "contactPerson", "areas"})
     Page<Volunteer> findByOrgIdAndIsActive(UUID orgId, boolean isActive, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"person", "org", "contactPerson", "areas"})
+    Page<Volunteer> findByOrgIdAndAreasId(UUID orgId, UUID areaId, Pageable pageable);
+
     boolean existsByPersonIdAndOrgId(UUID personId, UUID orgId);
 }

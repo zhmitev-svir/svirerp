@@ -53,8 +53,9 @@ public class MembershipController {
     // ── Member ───────────────────────────────────────────────────────────────
 
     @GetMapping("/api/organizations/{orgId}/members")
-    public Page<Member> listMembers(@PathVariable UUID orgId, Pageable pageable) {
-        return service.findAllMembers(orgId, pageable);
+    public Page<Member> listMembers(@PathVariable UUID orgId,
+            @RequestParam(required = false) String status, Pageable pageable) {
+        return service.findAllMembers(orgId, status, pageable);
     }
 
     @GetMapping("/api/organizations/{orgId}/members/import-template")

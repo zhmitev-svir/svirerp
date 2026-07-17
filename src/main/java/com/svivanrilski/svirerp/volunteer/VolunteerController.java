@@ -20,8 +20,9 @@ public class VolunteerController {
     // ── Volunteer ─────────────────────────────────────────────────────────────
 
     @GetMapping("/api/organizations/{orgId}/volunteers")
-    public Page<Volunteer> listVolunteers(@PathVariable UUID orgId, Pageable pageable) {
-        return service.findByOrg(orgId, pageable);
+    public Page<Volunteer> listVolunteers(@PathVariable UUID orgId,
+            @RequestParam(required = false) UUID areaId, Pageable pageable) {
+        return service.findByOrg(orgId, areaId, pageable);
     }
 
     @GetMapping("/api/volunteers/{id}")

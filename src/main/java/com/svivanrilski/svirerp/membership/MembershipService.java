@@ -77,8 +77,12 @@ public class MembershipService {
 
     // ── Member ───────────────────────────────────────────────────────────────
 
-    public Page<Member> findAllMembers(UUID orgId, Pageable pageable) {
-        return memberRepo.findByOrgId(orgId, pageable);
+    public Page<Member> findAllMembers(UUID orgId, String status, Pageable pageable) {
+        if (status == null || status.isBlank()) {
+            return memberRepo.findByOrgId(orgId, pageable);
+        }
+        validateMemberStatus(status);
+        return memberRepo.findByOrgIdAndStatus(orgId, status, pageable);
     }
 
     public Member findMemberById(UUID id) {

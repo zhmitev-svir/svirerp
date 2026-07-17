@@ -40,8 +40,11 @@ public class VolunteerService {
 
     // ── Volunteer ─────────────────────────────────────────────────────────────
 
-    public Page<Volunteer> findByOrg(UUID orgId, Pageable pageable) {
-        return volunteerRepo.findByOrgId(orgId, pageable);
+    public Page<Volunteer> findByOrg(UUID orgId, UUID areaId, Pageable pageable) {
+        if (areaId == null) {
+            return volunteerRepo.findByOrgId(orgId, pageable);
+        }
+        return volunteerRepo.findByOrgIdAndAreasId(orgId, areaId, pageable);
     }
 
     public Volunteer findById(UUID id) {

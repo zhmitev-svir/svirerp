@@ -1,11 +1,15 @@
 import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { PageEvent } from '@angular/material/paginator';
 import { MatDialog } from '@angular/material/dialog';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
+import { FormsModule } from '@angular/forms';
 
 import { VolunteerService } from '../../services/volunteer.service';
+import { VolunteerAreaService } from '../../services/volunteer-area.service';
 import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
-import { Person, Volunteer } from '../../../../core/models/domain.model';
+import { Person, Volunteer, VolunteerArea } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
 import { DataTableComponent, TableColumn, TableAction } from '../../../../shared/components/data-table/data-table.component';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
@@ -17,7 +21,7 @@ import { PersonDetailsDialogComponent } from '../../../persons/pages/person-deta
   selector: 'app-volunteer-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DataTableComponent, PageHeaderComponent],
+  imports: [DataTableComponent, PageHeaderComponent, MatFormFieldModule, MatSelectModule, FormsModule],
   template: `
     <div class="page-container">
       <app-page-header
@@ -26,6 +30,18 @@ import { PersonDetailsDialogComponent } from '../../../persons/pages/person-deta
         actionLabel="Add Volunteer"
         actionIcon="volunteer_activism"
         (action)="openForm()" />
+
+      <div class="filter-bar">
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Area</mat-label>
+          <mat-select [(ngModel)]="areaFilter" (selectionChange)="onFilterChange()">
+            <mat-option [value]="null">All</mat-option>
+            @for (a of areas(); track a.id) {
+              <mat-option [value]="a.id">{{ a.name }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
 
       <app-data-table
         [columns]="columns"
@@ -36,9 +52,14 @@ import { PersonDetailsDialogComponent } from '../../../persons/pages/person-deta
         (pageChange)="onPageChange($event)" />
     </div>
   `,
+  styles: [`
+    .filter-bar { display: flex; gap: 12px; margin-bottom: 8px; }
+    .filter-field { width: 220px; }
+  `],
 })
 export class VolunteerListComponent implements OnInit {
   private volunteerService = inject(VolunteerService);
+  private areaService = inject(VolunteerAreaService);
   private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
@@ -48,6 +69,8 @@ export class VolunteerListComponent implements OnInit {
   page = signal<Page<Volunteer> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
+  areas = signal<VolunteerArea[]>([]);
+  areaFilter: string | null = null;
 
   readonly columns: TableColumn[] = [
     {
@@ -72,6 +95,9 @@ export class VolunteerListComponent implements OnInit {
       next: orgId => {
         this.orgId = orgId;
         this.loadPage();
+        this.areaService.getPageForOrg(orgId, { page: 0, size: 100 }).subscribe(page => {
+          this.areas.set(page.content);
+        });
       },
       error: err => this.notifications.error(err.message ?? 'Could not load organization.'),
     });
@@ -79,6 +105,11 @@ export class VolunteerListComponent implements OnInit {
 
   onPageChange(event: PageEvent): void {
     this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.loadPage();
+  }
+
+  onFilterChange(): void {
+    this.pageParams.set({ ...this.pageParams(), page: 0 });
     this.loadPage();
   }
 
@@ -110,7 +141,7 @@ export class VolunteerListComponent implements OnInit {
   private loadPage(): void {
     if (!this.orgId) return;
     this.loading.set(true);
-    this.volunteerService.getPageForOrg(this.orgId, this.pageParams()).subscribe({
+    this.volunteerService.getPageForOrg(this.orgId, this.pageParams(), this.areaFilter).subscribe({
       next: data => { this.page.set(data); this.loading.set(false); },
       error: ()   => this.loading.set(false),
     });

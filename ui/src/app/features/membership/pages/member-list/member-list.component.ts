@@ -3,6 +3,9 @@ import { PageEvent } from '@angular/material/paginator';
 import { MatDialog } from '@angular/material/dialog';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
+import { FormsModule } from '@angular/forms';
 
 import { MemberService } from '../../services/member.service';
 import { OrgContextService } from '../../../../core/services/org-context.service';
@@ -19,7 +22,7 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
   selector: 'app-member-list',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [DataTableComponent, PageHeaderComponent, MatButtonModule, MatIconModule],
+  imports: [DataTableComponent, PageHeaderComponent, MatButtonModule, MatIconModule, MatFormFieldModule, MatSelectModule, FormsModule],
   template: `
     <div class="page-container">
       <app-page-header
@@ -40,6 +43,18 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
         </ng-container>
       </app-page-header>
 
+      <div class="filter-bar">
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Status</mat-label>
+          <mat-select [(ngModel)]="statusFilter" (selectionChange)="onFilterChange()">
+            <mat-option [value]="null">All</mat-option>
+            @for (s of statuses; track s) {
+              <mat-option [value]="s">{{ s }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+      </div>
+
       <app-data-table
         [columns]="columns"
         [actions]="actions"
@@ -49,6 +64,10 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
         (pageChange)="onPageChange($event)" />
     </div>
   `,
+  styles: [`
+    .filter-bar { display: flex; gap: 12px; margin-bottom: 8px; }
+    .filter-field { width: 220px; }
+  `],
 })
 export class MemberListComponent implements OnInit {
   private memberService = inject(MemberService);
@@ -60,6 +79,9 @@ export class MemberListComponent implements OnInit {
   page = signal<Page<Member> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
+
+  readonly statuses = ['active', 'inactive', 'suspended', 'expired', 'pending'];
+  statusFilter: string | null = null;
 
   readonly columns: TableColumn[] = [
     { key: 'person', header: 'Name', cell: m => `${m.person.firstName} ${m.person.lastName}` },
@@ -81,6 +103,11 @@ export class MemberListComponent implements OnInit {
 
   onPageChange(event: PageEvent): void {
     this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.loadPage();
+  }
+
+  onFilterChange(): void {
+    this.pageParams.set({ ...this.pageParams(), page: 0 });
     this.loadPage();
   }
 
@@ -144,7 +171,7 @@ export class MemberListComponent implements OnInit {
     this.orgContext.ensureOrgId().subscribe({
       next: orgId => {
         this.orgId = orgId;
-        this.memberService.getPageForOrg(orgId, this.pageParams()).subscribe({
+        this.memberService.getPageForOrg(orgId, this.pageParams(), this.statusFilter).subscribe({
           next: data => { this.page.set(data); this.loading.set(false); },
           error: () => this.loading.set(false),
         });

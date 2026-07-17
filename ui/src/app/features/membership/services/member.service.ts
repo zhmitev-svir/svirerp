@@ -15,10 +15,13 @@ export class MemberService extends ResourceService<Member> {
   }
 
   /** List is org-scoped (unlike get/create/update/delete, which are flat). */
-  getPageForOrg(orgId: string, params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<Member>> {
+  getPageForOrg(orgId: string, params: PageParams = DEFAULT_PAGE_PARAMS, status?: string | null): Observable<Page<Member>> {
     let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
     if (params.sort) {
       p = p.set('sort', params.sort);
+    }
+    if (status) {
+      p = p.set('status', status);
     }
     return this.http.get<Page<Member>>(
       `${this.orgScopedEnv.apiUrl}/organizations/${orgId}/members`,
