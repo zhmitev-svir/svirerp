@@ -23,6 +23,13 @@ export const settingsRoutes: Routes = [
             m => m.OrganizationSettingsComponent,
           ),
       },
+      {
+        path: 'gmail',
+        loadComponent: () =>
+          import('./pages/gmail-settings/gmail-settings.component').then(
+            m => m.GmailSettingsComponent,
+          ),
+      },
     ],
   },
 ];

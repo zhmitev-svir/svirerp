@@ -56,6 +56,14 @@
             <artifactId>spring-boot-starter-oauth2-client</artifactId>
         </dependency>
 
+        <!-- jakarta.mail MimeMessage/MimeMessageHelper only, to build well-formed RFC 822
+             messages in memory for the Gmail API (see the email package) — delivery goes
+             over HTTPS to Gmail, never SMTP, so no mail-server connectivity is opened. -->
+        <dependency>
+            <groupId>org.springframework.boot</groupId>
+            <artifactId>spring-boot-starter-mail</artifactId>
+        </dependency>
+
         <!-- Schema migrations: Flyway owns all DDL; JPA is set to validate-only.
              MySQL support is included in flyway-core; no separate DB module required. -->
         <dependency>

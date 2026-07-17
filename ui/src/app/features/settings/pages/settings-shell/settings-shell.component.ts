@@ -17,6 +17,10 @@ import { MatTabsModule } from '@angular/material/tabs';
          [active]="orgActive.isActive">
         Organization
       </a>
+      <a mat-tab-link routerLink="gmail" routerLinkActive #gmailActive="routerLinkActive"
+         [active]="gmailActive.isActive">
+        Gmail
+      </a>
     </nav>
     <mat-tab-nav-panel #tabPanel>
       <router-outlet />
