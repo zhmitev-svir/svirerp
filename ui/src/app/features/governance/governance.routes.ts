@@ -4,8 +4,32 @@ export const governanceRoutes: Routes = [
   {
     path: '',
     loadComponent: () =>
-      import('./pages/governance-home/governance-home.component').then(
-        m => m.GovernanceHomeComponent,
+      import('./pages/governance-shell/governance-shell.component').then(
+        m => m.GovernanceShellComponent,
       ),
+    children: [
+      { path: '', redirectTo: 'trustees', pathMatch: 'full' },
+      {
+        path: 'trustees',
+        loadComponent: () =>
+          import('./pages/trustee-list/trustee-list.component').then(
+            m => m.TrusteeListComponent,
+          ),
+      },
+      {
+        path: 'meeting-minutes',
+        loadComponent: () =>
+          import('./pages/meeting-minutes-list/meeting-minutes-list.component').then(
+            m => m.MeetingMinutesListComponent,
+          ),
+      },
+      {
+        path: 'meeting-minutes/:id',
+        loadComponent: () =>
+          import('./pages/meeting-minutes-detail/meeting-minutes-detail.component').then(
+            m => m.MeetingMinutesDetailComponent,
+          ),
+      },
+    ],
   },
 ];

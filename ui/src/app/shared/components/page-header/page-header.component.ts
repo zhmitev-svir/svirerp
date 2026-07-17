@@ -15,14 +15,17 @@ import { MatIconModule } from '@angular/material/icon';
           <p class="mat-body-2 page-subtitle">{{ subtitle() }}</p>
         }
       </div>
-      @if (actionLabel()) {
-        <button mat-flat-button color="primary" (click)="action.emit()">
-          @if (actionIcon()) {
-            <mat-icon>{{ actionIcon() }}</mat-icon>
-          }
-          {{ actionLabel() }}
-        </button>
-      }
+      <div class="page-header__actions">
+        <ng-content select="[extraActions]" />
+        @if (actionLabel()) {
+          <button mat-flat-button color="primary" (click)="action.emit()">
+            @if (actionIcon()) {
+              <mat-icon>{{ actionIcon() }}</mat-icon>
+            }
+            {{ actionLabel() }}
+          </button>
+        }
+      </div>
     </div>
   `,
   styles: [`
@@ -35,6 +38,7 @@ import { MatIconModule } from '@angular/material/icon';
       gap: 16px;
     }
     .page-header__text { display: flex; flex-direction: column; gap: 2px; }
+    .page-header__actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
     .page-title { margin: 0; }
     .page-subtitle { margin: 0; color: rgba(0,0,0,.54); }
   `],

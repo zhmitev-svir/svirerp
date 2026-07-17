@@ -4,8 +4,25 @@ export const membershipRoutes: Routes = [
   {
     path: '',
     loadComponent: () =>
-      import('./pages/membership-home/membership-home.component').then(
-        m => m.MembershipHomeComponent,
+      import('./pages/membership-shell/membership-shell.component').then(
+        m => m.MembershipShellComponent,
       ),
+    children: [
+      { path: '', redirectTo: 'members', pathMatch: 'full' },
+      {
+        path: 'types',
+        loadComponent: () =>
+          import('./pages/membership-type-list/membership-type-list.component').then(
+            m => m.MembershipTypeListComponent,
+          ),
+      },
+      {
+        path: 'members',
+        loadComponent: () =>
+          import('./pages/member-list/member-list.component').then(
+            m => m.MemberListComponent,
+          ),
+      },
+    ],
   },
 ];

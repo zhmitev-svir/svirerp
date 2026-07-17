@@ -24,3 +24,29 @@ export interface ApiError {
   message: string;
   fields?: Record<string, string>; // populated on validation failures
 }
+
+/** Response shape of POST /api/organizations/{orgId}/members/import — a synthesized
+ * batch-operation summary, not a persisted entity, so it lives here rather than
+ * in domain.model.ts. */
+export interface MemberImportResult {
+  created: number;
+  updated: number;
+  failed: MemberImportRowError[];
+}
+
+export interface MemberImportRowError {
+  rowNumber: number;
+  email: string | null;
+  message: string;
+}
+
+/** Response shape of GET/PUT /api/settings — admin-only runtime config. `value`
+ * is always null for SECRET settings; `hasValue` tells the UI whether one is
+ * configured without ever exposing it. */
+export interface AppSetting {
+  key: string;
+  value: string | null;
+  valueType: 'STRING' | 'SECRET' | 'BOOLEAN' | 'NUMBER';
+  description?: string;
+  hasValue: boolean;
+}

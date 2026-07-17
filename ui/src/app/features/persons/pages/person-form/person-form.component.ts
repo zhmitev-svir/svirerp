@@ -148,9 +148,9 @@ export class PersonFormComponent implements OnInit {
       : this.personService.create(payload);
 
     op.subscribe({
-      next: () => {
+      next: (result) => {
         this.notifications.success(`Person ${this.isEdit ? 'updated' : 'created'}.`);
-        this.dialogRef.close(true);
+        this.dialogRef.close(result);
       },
       error: () => this.saving.set(false),
     });
