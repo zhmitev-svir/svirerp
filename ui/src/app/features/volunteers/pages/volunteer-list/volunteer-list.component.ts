@@ -5,12 +5,13 @@ import { MatDialog } from '@angular/material/dialog';
 import { VolunteerService } from '../../services/volunteer.service';
 import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
-import { Volunteer } from '../../../../core/models/domain.model';
+import { Person, Volunteer } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
 import { DataTableComponent, TableColumn, TableAction } from '../../../../shared/components/data-table/data-table.component';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { VolunteerFormComponent } from '../volunteer-form/volunteer-form.component';
+import { PersonDetailsDialogComponent } from '../../../persons/pages/person-details/person-details-dialog.component';
 
 @Component({
   selector: 'app-volunteer-list',
@@ -49,7 +50,12 @@ export class VolunteerListComponent implements OnInit {
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
 
   readonly columns: TableColumn[] = [
-    { key: 'volunteer', header: 'Volunteer', cell: (v: Volunteer) => `${v.person.firstName} ${v.person.lastName}` },
+    {
+      key: 'volunteer',
+      header: 'Volunteer',
+      cell: (v: Volunteer) => `${v.person.firstName} ${v.person.lastName}`,
+      link: (v: Volunteer) => this.openPersonDetails(v.person),
+    },
     { key: 'contact', header: 'Contact', cell: (v: Volunteer) => v.contactPerson ? `${v.contactPerson.firstName} ${v.contactPerson.lastName}` : '—' },
     { key: 'areas', header: 'Areas', cell: (v: Volunteer) => (v.areas ?? []).map(a => a.name).join(', ') || '—' },
     { key: 'onboardDate', header: 'Onboarded' },
@@ -74,6 +80,10 @@ export class VolunteerListComponent implements OnInit {
   onPageChange(event: PageEvent): void {
     this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
     this.loadPage();
+  }
+
+  openPersonDetails(person: Person): void {
+    this.dialog.open(PersonDetailsDialogComponent, { width: '360px', data: person });
   }
 
   openForm(volunteer?: Volunteer): void {

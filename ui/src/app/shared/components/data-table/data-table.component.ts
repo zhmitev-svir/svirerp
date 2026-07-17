@@ -15,6 +15,9 @@ export interface TableColumn {
   /** Optional transform applied when rendering the cell value. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   cell?: (row: any) => string;
+  /** If set, the cell renders as a clickable link that calls this instead of plain text. */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  link?: (row: any) => void;
 }
 
 export interface TableAction {
@@ -62,7 +65,11 @@ export interface TableAction {
           <ng-container [matColumnDef]="col.key">
             <mat-header-cell *matHeaderCellDef>{{ col.header }}</mat-header-cell>
             <mat-cell *matCellDef="let row">
-              {{ col.cell ? col.cell(row) : (row[col.key] ?? '') }}
+              @if (col.link) {
+                <a class="cell-link" (click)="col.link(row)">{{ col.cell ? col.cell(row) : (row[col.key] ?? '') }}</a>
+              } @else {
+                {{ col.cell ? col.cell(row) : (row[col.key] ?? '') }}
+              }
             </mat-cell>
           </ng-container>
         }
@@ -107,6 +114,8 @@ export interface TableAction {
     .actions-cell { justify-content: flex-end; min-width: 100px; }
     .no-data-row { display: block; }
     .no-data-cell { text-align: center; padding: 32px; color: rgba(0,0,0,.54); display: block; }
+    .cell-link { color: #3f51b5; cursor: pointer; text-decoration: none; }
+    .cell-link:hover { text-decoration: underline; }
   `],
 })
 export class DataTableComponent {
