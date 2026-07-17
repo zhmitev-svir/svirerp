@@ -48,11 +48,12 @@ svirerp/
 │       │   ├── event/
 │       │   ├── volunteer/
 │       │   ├── finance/
-│       │   └── settings/       # Admin-only app_setting key/value store (Google OAuth creds, etc.)
+│       │   ├── settings/       # Admin-only app_setting key/value store (Google OAuth creds, etc.)
+│       │   └── email/          # Gmail API email sending + Connect Gmail OAuth flow
 │       └── resources/
 │           ├── application.properties              # Base config (env-var placeholders)
 │           ├── application-local.properties.example  # Copy & fill for local dev
-│           └── db/migration/                       # Flyway V1–V30 SQL scripts
+│           └── db/migration/                       # Flyway V1–V31 SQL scripts
 ├── ui/                          # Angular 21 front-end (see Angular UI section)
 ├── mvnw                         # Unix Maven Wrapper
 ├── mvnw.cmd                     # Windows Maven Wrapper
@@ -202,6 +203,23 @@ Generic key/value configuration backed by the `app_setting` table (migration V28
 ### Organization
 
 This is a single-org-per-installation app — there's no organization list/picker. The Organization tab under Settings (`/settings/organization`) is the one place to view/edit that org's own details; it replaced the standalone Organizations list/form pages and nav item.
+
+### Gmail (email sending)
+
+The Gmail tab under Settings (`/settings/gmail`, migration V31) lets an admin connect a Gmail account so the app can send email through the **Gmail API** (not SMTP) using an OAuth2 refresh token — no app password or SMTP credentials ever touch the server.
+
+**One-time Google Cloud Console setup** (separate OAuth Client from the one used for [Google sign-in](#authentication)):
+
+1. Create an OAuth 2.0 Client ID (Web application type) with authorized redirect URI `{origin}/api/settings/gmail/callback` (e.g. `http://localhost:8080/api/settings/gmail/callback` for local dev) and the `gmail.send` scope.
+2. On the admin Settings → Gmail page, paste the client ID and secret and save.
+3. Click **Connect Gmail** — this starts the OAuth consent flow (`GET /api/settings/gmail/authorize-url`) and, on approval, the callback (`GET /api/settings/gmail/callback`) exchanges the auth code for a refresh token and stores it (encrypted) along with the connected account's address (`gmail.sender-address`) in `app_setting`.
+4. Use **Send Test Email** on the same page to confirm the connection works end-to-end.
+
+Access tokens are minted on demand from the stored refresh token (`GmailTokenService`, cached in memory until near expiry) — rotating the client secret or reconnecting the account takes effect immediately, no restart needed, same pattern as Google sign-in's client credentials.
+
+- `GET /api/settings/gmail/authorize-url` — builds the Google consent URL (`ROLE_ADMIN`)
+- `GET /api/settings/gmail/callback` — OAuth2 redirect target; not called directly
+- `POST /api/settings/gmail/test-send` — `{ "to": "..." }`, sends a canned test email (`ROLE_ADMIN`)
 
 ---
 
@@ -372,6 +390,7 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | Bank accounts | `GET/POST /api/bank-accounts` | |
 | Reconciliations | `GET/POST /api/reconciliations` | |
 | App settings (admin) | `GET /api/settings` | `PUT /api/settings/{key}`; `ROLE_ADMIN` only, `SECRET` values never returned |
+| Gmail (admin) | `GET /api/settings/gmail/authorize-url` | `GET .../callback` (OAuth redirect target), `POST .../test-send`; `ROLE_ADMIN` only — see [Admin Settings](#admin-settings) |
 
 Pagination is available on all list endpoints via `?page=0&size=20&sort=field,asc`.
 
@@ -411,3 +430,4 @@ Pagination is available on all list endpoints via `?page=0&size=20&sort=field,as
 | V28 | `app_setting` |
 | V29 | `meeting_minutes` |
 | V30 | `action_item` (nullable FK to `trustee` — assignee is optional) |
+| V31 | `app_setting` rows for Gmail OAuth (`gmail.oauth.client-id`/`client-secret`/`refresh-token`, `gmail.sender-address`) — no new table, reuses V28's `app_setting` |
