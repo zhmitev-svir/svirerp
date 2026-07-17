@@ -209,21 +209,17 @@ export class VolunteerFormComponent implements OnInit {
   }
 
   addPerson(target: 'volunteer' | 'contact'): void {
-    const existingIds = new Set(this.persons().map(p => p.id));
     this.dialog
       .open(PersonFormComponent, { width: '540px', data: null })
       .afterClosed()
-      .subscribe(saved => {
-        if (!saved) return;
-        this.personService.getPage({ page: 0, size: 200 }).subscribe(page => {
-          this.persons.set(page.content);
-          const newest = page.content.find(p => !existingIds.has(p.id)) ?? page.content[0];
-          if (target === 'volunteer') {
-            this.form.controls.personId.setValue(newest.id);
-          } else {
-            this.form.controls.contactPersonId.setValue(newest.id);
-          }
-        });
+      .subscribe((created: Person | undefined) => {
+        if (!created) return;
+        this.persons.update(list => [...list, created]);
+        if (target === 'volunteer') {
+          this.form.controls.personId.setValue(created.id);
+        } else {
+          this.form.controls.contactPersonId.setValue(created.id);
+        }
       });
   }
 
