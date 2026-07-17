@@ -11,12 +11,13 @@ Non-profit ERP system for the SVIR organization — Spring Boot 3 REST API backe
 3. [Quick Start](#quick-start)
 4. [Configuration](#configuration)
 5. [Authentication](#authentication)
-6. [Building](#building)
-7. [Database Migrations](#database-migrations)
-8. [Running the API](#running-the-api)
-9. [Angular UI](#angular-ui)
-10. [API Overview](#api-overview)
-11. [Migration Reference](#migration-reference)
+6. [Admin Settings](#admin-settings)
+7. [Building](#building)
+8. [Database Migrations](#database-migrations)
+9. [Running the API](#running-the-api)
+10. [Angular UI](#angular-ui)
+11. [API Overview](#api-overview)
+12. [Migration Reference](#migration-reference)
 
 ---
 
@@ -28,7 +29,7 @@ Non-profit ERP system for the SVIR organization — Spring Boot 3 REST API backe
 | MySQL | 8.0 | Must be running before starting the app |
 | Maven | — | **Not required** — use the included wrapper (`mvnw`) |
 | Node.js | 20 LTS | Only needed for the Angular UI |
-| Google Cloud / Workspace admin access | — | Needed once to create an OAuth 2.0 Client — see [Authentication](#authentication). The app will not start without a client ID/secret configured, the same way it won't start without MySQL credentials. |
+| Google Cloud / Workspace admin access | — | Needed once to create an OAuth 2.0 Client — see [Authentication](#authentication). Unlike MySQL credentials, the app starts fine without one configured; Google sign-in just won't work until it's set on the admin [Settings page](#admin-settings). |
 
 ---
 
@@ -38,7 +39,7 @@ Non-profit ERP system for the SVIR organization — Spring Boot 3 REST API backe
 svirerp/
 ├── src/
 │   └── main/
-│       ├── java/org/svir/svirerp/
+│       ├── java/com/svivanrilski/svirerp/
 │       │   ├── common/          # GlobalExceptionHandler, ResourceNotFoundException
 │       │   ├── person/          # Entity, Repository, Service, Controller
 │       │   ├── organization/
@@ -46,11 +47,13 @@ svirerp/
 │       │   ├── governance/
 │       │   ├── event/
 │       │   ├── volunteer/
-│       │   └── finance/
+│       │   ├── finance/
+│       │   ├── settings/       # Admin-only app_setting key/value store (Google OAuth creds, etc.)
+│       │   └── email/          # Gmail API email sending + Connect Gmail OAuth flow
 │       └── resources/
 │           ├── application.properties              # Base config (env-var placeholders)
 │           ├── application-local.properties.example  # Copy & fill for local dev
-│           └── db/migration/                       # Flyway V1–V26, V32–V34 SQL scripts (gap explained in Migration Reference)
+│           └── db/migration/                       # Flyway V1–V34 SQL scripts
 ├── ui/                          # Angular 21 front-end (see Angular UI section)
 ├── mvnw                         # Unix Maven Wrapper
 ├── mvnw.cmd                     # Windows Maven Wrapper
@@ -70,14 +73,16 @@ cp src/main/resources/application-local.properties.example \
    src/main/resources/application-local.properties
 # Edit application-local.properties with your MySQL user/password
 
-# 3. Run Flyway migrations (creates all 28 tables)
+# 3. Run Flyway migrations (creates all 31 tables)
 ./mvnw flyway:migrate \
   -Dflyway.url="jdbc:mysql://localhost:3306/svirerp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true" \
   -Dflyway.user=root \
   -Dflyway.password=your_password
 
-# 4. Set up Google sign-in (required — see Authentication section).
-#    Add your dev OAuth Client's id/secret to application-local.properties.
+# 4. Set up Google sign-in (see Authentication section): enable the
+#    break-glass local admin login via env vars/application-local.properties,
+#    log in at /portal-access, then enter your dev OAuth Client's id/secret
+#    on the admin Settings page.
 
 # 5. Build and run
 ./mvnw clean package -DskipTests
@@ -147,9 +152,10 @@ java -jar target/svirerp-1.0.0-SNAPSHOT.jar \
 | `spring.flyway.baseline-on-migrate` | `true` | Safe for databases that already have data |
 | `app.cors.allowed-origins` | `http://localhost:4200` | Comma-separated origins allowed to call `/api/**`; override via `SVIRERP_CORS_ALLOWED_ORIGINS` when the UI is served from a different host |
 | `app.auth.google.allowed-domain` | `svivanrilski.com` | Google Workspace hosted domain allowed to sign in; override via `SVIRERP_GOOGLE_ALLOWED_DOMAIN` |
-| `spring.security.oauth2.client.registration.google.client-id` | *(empty — required)* | Google OAuth 2.0 Client ID; set via `SVIRERP_GOOGLE_CLIENT_ID` or `application-local.properties` |
-| `spring.security.oauth2.client.registration.google.client-secret` | *(empty — required)* | Google OAuth 2.0 Client secret; set via `SVIRERP_GOOGLE_CLIENT_SECRET` or `application-local.properties` |
 | `app.auth.admin.username` / `app.auth.admin.password-hash` | *(empty — disabled)* | Break-glass local admin login; blank disables it. Set via `SVIRERP_ADMIN_USERNAME` / `SVIRERP_ADMIN_PASSWORD_HASH` |
+| `app.settings.encryption-key` / `app.settings.encryption-salt` | *(empty — required for SECRET settings)* | Encrypts `SECRET`-type rows in the `app_setting` table (e.g. the Google OAuth client secret). Salt must be hex-encoded. Set via `SVIRERP_SETTINGS_ENCRYPTION_KEY` / `SVIRERP_SETTINGS_ENCRYPTION_SALT` — see [Admin Settings](#admin-settings) |
+
+> **Note:** The Google OAuth 2.0 client ID/secret are **not** properties — they're configured at runtime via the admin-only Settings page and stored (secret encrypted) in the `app_setting` table, so they can be rotated with no restart. See [Admin Settings](#admin-settings).
 
 ---
 
@@ -167,14 +173,9 @@ Restricted to accounts in the org's Google Workspace domain (`app.auth.google.al
 2. **Create two OAuth 2.0 Client IDs** (Web application type) — one per environment, so dev and prod secrets are independent:
    - **Dev**: Authorized redirect URI `http://localhost:8080/login/oauth2/code/google`
    - **Prod**: Authorized redirect URI `https://svirerp.svivanrilski.com/login/oauth2/code/google`
-3. Put the **dev** client's id/secret in `application-local.properties` (gitignored):
-   ```properties
-   spring.security.oauth2.client.registration.google.client-id=YOUR_DEV_CLIENT_ID
-   spring.security.oauth2.client.registration.google.client-secret=YOUR_DEV_CLIENT_SECRET
-   ```
-   Put the **prod** client's id/secret in real env vars on the deploy target: `SVIRERP_GOOGLE_CLIENT_ID`, `SVIRERP_GOOGLE_CLIENT_SECRET`.
+3. Log in as the [local admin](#local-admin-login-break-glass-fallback) and enter the **dev** client's id/secret on the admin-only Settings page (`/settings`). For prod, log in as the prod deployment's local admin and do the same there — each environment's credentials live only in its own database, never in a properties file. See [Admin Settings](#admin-settings) for details.
 
-The app will not start if `client-id` is blank — this mirrors the existing MySQL-credentials requirement, not a new restriction pattern.
+Unlike MySQL credentials, a blank Google client ID does **not** prevent the app from starting — it just means the `google` OAuth2 client registration resolves to nothing, so Google sign-in fails (`/oauth2/authorization/google` 404s) until it's configured on the Settings page. This is also why the local admin login must be set up first: it's the only way to reach the Settings page and bootstrap Google sign-in.
 
 ### Local admin login (break-glass fallback)
 
@@ -185,6 +186,40 @@ A single admin account, for when Google sign-in is unavailable. Disabled by defa
 3. Sign in at `/portal-access` — this route is intentionally not linked from the login page or any navigation; it's meant to be known only to whoever holds the admin credentials.
 
 Failed attempts are rate-limited (5 failures per IP within 15 minutes triggers a 15-minute lockout) and every attempt — success, failure, or lockout — is audit-logged under the `AUDIT.local-admin-login` logger name.
+
+---
+
+## Admin Settings
+
+An admin-only Settings area (`/settings` in the UI, gated by `ROLE_ADMIN` — only the [local admin login](#local-admin-login-break-glass-fallback) has this role, so Google-authenticated users never see it) covers two things:
+
+### General settings
+
+Generic key/value configuration backed by the `app_setting` table (migration V28) — new settings are a migration row away rather than new plumbing. Each row has a `valueType`; `SECRET`-type values (currently `google.oauth.client-id` and `google.oauth.client-secret`) are encrypted at rest with `app.settings.encryption-key`/`app.settings.encryption-salt` and are **never** sent back to the frontend, even as ciphertext — the API only reports a `hasValue` flag. Changing the Google client id/secret here takes effect on the very next login attempt, with no app restart, since `SecurityConfig` resolves them fresh from the table on every OAuth2 login (see [Authentication](#authentication)).
+
+- `GET /api/settings` — list all settings (secrets redacted)
+- `PUT /api/settings/{key}` — update a single setting's value
+
+### Organization
+
+This is a single-org-per-installation app — there's no organization list/picker. The Organization tab under Settings (`/settings/organization`) is the one place to view/edit that org's own details; it replaced the standalone Organizations list/form pages and nav item.
+
+### Gmail (email sending)
+
+The Gmail tab under Settings (`/settings/gmail`, migration V31) lets an admin connect a Gmail account so the app can send email through the **Gmail API** (not SMTP) using an OAuth2 refresh token — no app password or SMTP credentials ever touch the server.
+
+**One-time Google Cloud Console setup** (separate OAuth Client from the one used for [Google sign-in](#authentication)):
+
+1. Create an OAuth 2.0 Client ID (Web application type) with authorized redirect URI `{origin}/api/settings/gmail/callback` (e.g. `http://localhost:8080/api/settings/gmail/callback` for local dev) and the `gmail.send` scope.
+2. On the admin Settings → Gmail page, paste the client ID and secret and save.
+3. Click **Connect Gmail** — this starts the OAuth consent flow (`GET /api/settings/gmail/authorize-url`) and, on approval, the callback (`GET /api/settings/gmail/callback`) exchanges the auth code for a refresh token and stores it (encrypted) along with the connected account's address (`gmail.sender-address`) in `app_setting`.
+4. Use **Send Test Email** on the same page to confirm the connection works end-to-end.
+
+Access tokens are minted on demand from the stored refresh token (`GmailTokenService`, cached in memory until near expiry) — rotating the client secret or reconnecting the account takes effect immediately, no restart needed, same pattern as Google sign-in's client credentials.
+
+- `GET /api/settings/gmail/authorize-url` — builds the Google consent URL (`ROLE_ADMIN`)
+- `GET /api/settings/gmail/callback` — OAuth2 redirect target; not called directly
+- `POST /api/settings/gmail/test-send` — `{ "to": "..." }`, sends a canned test email (`ROLE_ADMIN`)
 
 ---
 
@@ -279,7 +314,7 @@ The Flyway Maven plugin lets you apply or inspect migrations without starting th
 3. Update the corresponding JPA entity
 4. Restart the app (or run `./mvnw flyway:migrate`) — Flyway applies it automatically
 
-> **Working against a database migrated by a different branch?** If your local DB already has migrations applied that aren't in your current branch's `db/migration/` folder (e.g. after switching branches), Flyway fails with "Detected applied migration not resolved locally." Uncomment `spring.flyway.ignore-migration-patterns=*:missing` in `application-local.properties` and number your new migration past the DB's current highest version, not this branch's highest local file.
+> **Working against a database migrated by a different branch?** If your local DB already has migrations applied that aren't in your current branch's `db/migration/` folder (e.g. after switching branches), Flyway fails with "Detected applied migration not resolved locally." Uncomment `spring.flyway.ignore-migration-patterns=*:missing` in `application-local.properties` and number your new migration past the DB's current highest applied version, not just this branch's highest local file.
 
 > **Never edit an already-applied migration.** Flyway validates checksums and will refuse to start if a committed script has changed.
 
@@ -340,12 +375,15 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 |---|---|---|
 | Auth | `GET /api/auth/me` | Current user `{ email, name, provider }`; 401 means not logged in |
 | Persons | `GET/POST /api/persons` | `GET /api/persons/{id}`, `PUT`, `DELETE` |
-| Organizations | `GET/POST /api/organizations` | |
-| Membership types | `GET/POST /api/organizations/{id}/membership-types` | |
-| Members | `GET/POST /api/members` | |
+| Organizations | `GET/POST /api/organizations` | Single-org-per-installation in practice; managed via the [Admin Settings](#admin-settings) Organization tab |
+| Membership types | `GET /api/organizations/{id}/membership-types` | `POST/PUT /api/membership-types[/{id}]`, `DELETE /api/membership-types/{id}` |
+| Members | `GET /api/organizations/{id}/members` | `POST/PUT /api/members[/{id}]`, `DELETE`, `GET .../expired` |
+| Member CSV import | `GET /api/organizations/{id}/members/import-template` | `POST .../members/import` (multipart CSV, best-effort per-row) |
 | Member payments | `GET/POST /api/member-payments` | |
-| Trustees | `GET/POST /api/trustees` | |
+| Trustees | `GET /api/organizations/{id}/trustees` | `POST/PUT /api/trustees[/{id}]`, `DELETE`, `POST .../{id}/renew` (re-elects for a fresh 2-year term) |
 | Committees | `GET/POST /api/committees` | |
+| Meeting minutes | `GET /api/organizations/{id}/meeting-minutes` | `POST/PUT /api/meeting-minutes[/{id}]`, `DELETE` (cascades to its action items); org-level board/trustee meetings, not tied to a committee |
+| Action items | `GET /api/meeting-minutes/{id}/action-items` | `POST/PUT /api/action-items[/{id}]`, `DELETE`; unpaginated list, optional trustee assignee |
 | Calendar events | `GET/POST /api/organizations/{id}/events` | `?from=&to=` date filter |
 | Volunteers | `GET/POST /api/volunteers` | `GET /api/organizations/{id}/volunteers` for org-scoped list; supports `contactPerson` + `areas` |
 | Volunteer areas | `GET/POST /api/organizations/{id}/volunteer-areas` | Org-scoped lookup (Construction, Cooking Crew, etc.); lazily seeded with 7 starter areas on first request; `POST /api/volunteer-areas` to add more |
@@ -354,6 +392,8 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | Journal entries | `GET/POST /api/journal-entries` | `POST …/{id}/post?approvedBy=` |
 | Bank accounts | `GET/POST /api/bank-accounts` | |
 | Reconciliations | `GET/POST /api/reconciliations` | |
+| App settings (admin) | `GET /api/settings` | `PUT /api/settings/{key}`; `ROLE_ADMIN` only, `SECRET` values never returned |
+| Gmail (admin) | `GET /api/settings/gmail/authorize-url` | `GET .../callback` (OAuth redirect target), `POST .../test-send`; `ROLE_ADMIN` only — see [Admin Settings](#admin-settings) |
 
 Pagination is available on all list endpoints via `?page=0&size=20&sort=field,asc`.
 
@@ -389,8 +429,11 @@ Pagination is available on all list endpoints via `?page=0&size=20&sort=field,as
 | V24 | `bank_transaction` |
 | V25 | `bank_reconciliation` (`difference` is a MySQL generated column) |
 | V26 | `reconciliation_item` |
+| V27 | `membership_type` + `can_vote` column |
+| V28 | `app_setting` |
+| V29 | `meeting_minutes` |
+| V30 | `action_item` (nullable FK to `trustee` — assignee is optional) |
+| V31 | `app_setting` rows for Gmail OAuth (`gmail.oauth.client-id`/`client-secret`/`refresh-token`, `gmail.sender-address`) — no new table, reuses V28's `app_setting` |
 | V32 | `volunteer.contact_person_id` (nullable FK to `person`, `ON DELETE SET NULL`) |
 | V33 | `volunteer_area` (org-scoped lookup) |
 | V34 | `volunteer_area_assignment` (many-to-many join, `volunteer` ↔ `volunteer_area`) |
-
-> **Gap between V26 and V32:** this branch (`feature/volunteer`) forked before V27–V31 (membership `can_vote`, `app_setting`, `meeting_minutes`, `action_item`, `gmail_settings`) landed on another branch — those migrations don't exist here. V32 was chosen to stay clear of that range on any shared dev database that already has them applied; see "Adding a new migration" above.

@@ -17,38 +17,55 @@ export interface Person {
 export interface Organization {
   id: string;
   name: string;
-  taxId?: string;
-  phone?: string;
-  email?: string;
-  website?: string;
+  legalName?: string;
+  taxIdEin?: string;
+  nonprofitType?: string;
+  missionStatement?: string;
   addressLine1?: string;
+  addressLine2?: string;
   city?: string;
   state?: string;
   zip?: string;
-  fiscalYearStartMonth?: number;
+  country?: string;
+  phone?: string;
+  email?: string;
+  website?: string;
+  foundedDate?: string;
+  fiscalYearStart?: string;
+  logoUrl?: string;
   createdAt?: string;
   updatedAt?: string;
 }
 
 // ─── Membership ─────────────────────────────────────────────────────────────
+// Entities have no DTO layer and serialize directly, so relations come back
+// as full nested objects (not flat *Id strings) — e.g. `org: {...}`, not `orgId`.
 export interface MembershipType {
   id: string;
-  orgId: string;
+  org: Organization;
   name: string;
   description?: string;
-  annualFee?: number;
-  isActive?: boolean;
+  annualFee: number;
+  durationMonths: number;
+  isActive: boolean;
+  canVote: boolean;
+  benefits?: string;
+  maxMembers?: number;
+  createdAt?: string;
 }
 
 export interface Member {
   id: string;
-  personId: string;
-  orgId: string;
-  membershipTypeId?: string;
-  status: 'active' | 'inactive' | 'suspended' | 'expired' | 'pending';
-  joinDate?: string;
-  expiryDate?: string;
+  person: Person;
+  org: Organization;
+  membershipType: MembershipType;
   memberNumber?: string;
+  joinDate: string;
+  expiryDate?: string;
+  status: 'active' | 'inactive' | 'suspended' | 'expired' | 'pending';
+  emailOptIn: boolean;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface MemberPayment {
@@ -64,21 +81,25 @@ export interface MemberPayment {
 // ─── Governance ─────────────────────────────────────────────────────────────
 export interface Trustee {
   id: string;
-  personId: string;
-  orgId: string;
+  person: Person;
+  org: Organization;
   title?: string;
-  role?: string;
-  termStart?: string;
+  role: string;
+  termStart: string;
   termEnd?: string;
-  isActive?: boolean;
+  isActive: boolean;
+  isOfficer: boolean;
+  notes?: string;
+  createdAt?: string;
 }
 
 export interface TrusteeDocument {
   id: string;
-  trusteeId: string;
-  documentType?: string;
-  filePath?: string;
+  trustee: Trustee;
+  documentType: string;
+  fileUrl: string;
   uploadedAt?: string;
+  notes?: string;
 }
 
 export interface Committee {
@@ -107,6 +128,29 @@ export interface CommitteeResolution {
   description?: string;
   status: 'passed' | 'failed' | 'tabled' | 'withdrawn';
   votedAt?: string;
+}
+
+// General board/trustee meeting record — org-level, not tied to a committee.
+export interface MeetingMinutes {
+  id: string;
+  org: Organization;
+  meetingDate: string;
+  title: string;
+  summary?: string;
+  createdAt?: string;
+}
+
+export interface ActionItem {
+  id: string;
+  meetingMinutes: MeetingMinutes;
+  assigneeTrustee?: Trustee;
+  note: string;
+  priority: 'high' | 'normal' | 'low';
+  dueDate?: string;
+  status: 'new' | 'planned' | 'done';
+  notes?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // ─── Events ─────────────────────────────────────────────────────────────────

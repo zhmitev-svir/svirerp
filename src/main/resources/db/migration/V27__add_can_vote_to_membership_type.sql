@@ -1,0 +1,2 @@
+ALTER TABLE membership_type
+    ADD COLUMN can_vote BOOLEAN NOT NULL DEFAULT FALSE;
