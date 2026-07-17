@@ -14,8 +14,11 @@ import org.svir.svirerp.person.Person;
 import org.svir.svirerp.person.PersonService;
 
 import java.math.BigDecimal;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -24,8 +27,13 @@ public class VolunteerService {
 
     private static final Set<String> HOUR_STATUSES = Set.of("pending", "approved", "rejected");
 
+    private static final List<String> STARTER_AREA_NAMES = List.of(
+            "Construction", "Apartment Repair", "Cleaning Crew", "Cooking Crew",
+            "Activities", "Outdoor Activities", "General");
+
     private final VolunteerRepository volunteerRepo;
     private final VolunteerHourRepository hourRepo;
+    private final VolunteerAreaRepository areaRepo;
     private final OrganizationService orgService;
     private final PersonService personService;
     private final CalendarEventRepository calendarEventRepo;
@@ -47,6 +55,8 @@ public class VolunteerService {
         Organization org = orgService.findById(volunteer.getOrg().getId());
         volunteer.setPerson(person);
         volunteer.setOrg(org);
+        volunteer.setContactPerson(resolveContactPerson(volunteer.getContactPerson()));
+        volunteer.setAreas(resolveAreas(volunteer.getAreas()));
         return volunteerRepo.save(volunteer);
     }
 
@@ -58,6 +68,8 @@ public class VolunteerService {
         existing.setSkills(patch.getSkills());
         existing.setAvailability(patch.getAvailability());
         existing.setNotes(patch.getNotes());
+        existing.setContactPerson(resolveContactPerson(patch.getContactPerson()));
+        existing.setAreas(resolveAreas(patch.getAreas()));
         return volunteerRepo.save(existing);
     }
 
@@ -65,6 +77,76 @@ public class VolunteerService {
     public void delete(UUID id) {
         if (!volunteerRepo.existsById(id)) throw new ResourceNotFoundException("Volunteer", id);
         volunteerRepo.deleteById(id);
+    }
+
+    private Person resolveContactPerson(Person contactPersonRef) {
+        return contactPersonRef == null ? null : personService.findById(contactPersonRef.getId());
+    }
+
+    private Set<VolunteerArea> resolveAreas(Set<VolunteerArea> areaRefs) {
+        if (areaRefs == null || areaRefs.isEmpty()) return new HashSet<>();
+        List<UUID> ids = areaRefs.stream().map(VolunteerArea::getId).collect(Collectors.toList());
+        return new HashSet<>(areaRepo.findAllById(ids));
+    }
+
+    // ── VolunteerArea ─────────────────────────────────────────────────────────
+
+    /** Not read-only: may lazily seed starter areas on an org's first request, so it overrides the class-level readOnly default. */
+    @Transactional
+    public Page<VolunteerArea> findAreasByOrg(UUID orgId, Pageable pageable) {
+        Page<VolunteerArea> page = areaRepo.findByOrgId(orgId, pageable);
+        if (page.isEmpty() && pageable.getPageNumber() == 0) {
+            seedStarterAreas(orgId);
+            page = areaRepo.findByOrgId(orgId, pageable);
+        }
+        return page;
+    }
+
+    private void seedStarterAreas(UUID orgId) {
+        Organization org = orgService.findById(orgId);
+        for (String name : STARTER_AREA_NAMES) {
+            if (!areaRepo.existsByOrgIdAndNameIgnoreCase(orgId, name)) {
+                areaRepo.save(VolunteerArea.builder().org(org).name(name).isActive(true).build());
+            }
+        }
+    }
+
+    public VolunteerArea findAreaById(UUID id) {
+        return areaRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("VolunteerArea", id));
+    }
+
+    @Transactional
+    public VolunteerArea createArea(VolunteerArea area) {
+        Organization org = orgService.findById(area.getOrg().getId());
+        validateUniqueAreaName(org.getId(), area.getName(), null);
+        area.setOrg(org);
+        return areaRepo.save(area);
+    }
+
+    @Transactional
+    public VolunteerArea updateArea(UUID id, VolunteerArea patch) {
+        VolunteerArea existing = findAreaById(id);
+        validateUniqueAreaName(existing.getOrg().getId(), patch.getName(), id);
+        existing.setName(patch.getName());
+        existing.setDescription(patch.getDescription());
+        existing.setIsActive(patch.getIsActive());
+        return areaRepo.save(existing);
+    }
+
+    @Transactional
+    public void deleteArea(UUID id) {
+        if (!areaRepo.existsById(id)) throw new ResourceNotFoundException("VolunteerArea", id);
+        areaRepo.deleteById(id);
+    }
+
+    private void validateUniqueAreaName(UUID orgId, String name, UUID excludeId) {
+        if (name == null) return;
+        areaRepo.findByOrgIdAndNameIgnoreCase(orgId, name)
+                .filter(a -> !a.getId().equals(excludeId))
+                .ifPresent(a -> {
+                    throw new IllegalArgumentException("A volunteer area named '" + name + "' already exists.");
+                });
     }
 
     // ── VolunteerHour ─────────────────────────────────────────────────────────

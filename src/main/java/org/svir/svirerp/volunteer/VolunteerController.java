@@ -45,6 +45,34 @@ public class VolunteerController {
         return ResponseEntity.noContent().build();
     }
 
+    // ── VolunteerArea ─────────────────────────────────────────────────────────
+
+    @GetMapping("/api/organizations/{orgId}/volunteer-areas")
+    public Page<VolunteerArea> listAreas(@PathVariable UUID orgId, Pageable pageable) {
+        return service.findAreasByOrg(orgId, pageable);
+    }
+
+    @GetMapping("/api/volunteer-areas/{id}")
+    public VolunteerArea getArea(@PathVariable UUID id) {
+        return service.findAreaById(id);
+    }
+
+    @PostMapping("/api/volunteer-areas")
+    public ResponseEntity<VolunteerArea> createArea(@Valid @RequestBody VolunteerArea area) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.createArea(area));
+    }
+
+    @PutMapping("/api/volunteer-areas/{id}")
+    public VolunteerArea updateArea(@PathVariable UUID id, @Valid @RequestBody VolunteerArea area) {
+        return service.updateArea(id, area);
+    }
+
+    @DeleteMapping("/api/volunteer-areas/{id}")
+    public ResponseEntity<Void> deleteArea(@PathVariable UUID id) {
+        service.deleteArea(id);
+        return ResponseEntity.noContent().build();
+    }
+
     // ── VolunteerHour ─────────────────────────────────────────────────────────
 
     @GetMapping("/api/volunteers/{volunteerId}/hours")

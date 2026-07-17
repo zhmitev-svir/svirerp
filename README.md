@@ -50,7 +50,7 @@ svirerp/
 │       └── resources/
 │           ├── application.properties              # Base config (env-var placeholders)
 │           ├── application-local.properties.example  # Copy & fill for local dev
-│           └── db/migration/                       # Flyway V1–V26 SQL scripts
+│           └── db/migration/                       # Flyway V1–V26, V32–V34 SQL scripts (gap explained in Migration Reference)
 ├── ui/                          # Angular 21 front-end (see Angular UI section)
 ├── mvnw                         # Unix Maven Wrapper
 ├── mvnw.cmd                     # Windows Maven Wrapper
@@ -70,7 +70,7 @@ cp src/main/resources/application-local.properties.example \
    src/main/resources/application-local.properties
 # Edit application-local.properties with your MySQL user/password
 
-# 3. Run Flyway migrations (creates all 26 tables)
+# 3. Run Flyway migrations (creates all 28 tables)
 ./mvnw flyway:migrate \
   -Dflyway.url="jdbc:mysql://localhost:3306/svirerp?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true" \
   -Dflyway.user=root \
@@ -274,10 +274,12 @@ The Flyway Maven plugin lets you apply or inspect migrations without starting th
 
 ### Adding a new migration
 
-1. Create `src/main/resources/db/migration/V27__your_description.sql`
+1. Create `src/main/resources/db/migration/V35__your_description.sql` (check `db/migration/` for the current highest version first — don't assume it matches this doc)
 2. Write your `ALTER TABLE` / `CREATE TABLE` / etc.
 3. Update the corresponding JPA entity
-4. Restart the app (or run `./mvnw flyway:migrate`) — Flyway applies V27 automatically
+4. Restart the app (or run `./mvnw flyway:migrate`) — Flyway applies it automatically
+
+> **Working against a database migrated by a different branch?** If your local DB already has migrations applied that aren't in your current branch's `db/migration/` folder (e.g. after switching branches), Flyway fails with "Detected applied migration not resolved locally." Uncomment `spring.flyway.ignore-migration-patterns=*:missing` in `application-local.properties` and number your new migration past the DB's current highest version, not this branch's highest local file.
 
 > **Never edit an already-applied migration.** Flyway validates checksums and will refuse to start if a committed script has changed.
 
@@ -345,7 +347,8 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | Trustees | `GET/POST /api/trustees` | |
 | Committees | `GET/POST /api/committees` | |
 | Calendar events | `GET/POST /api/organizations/{id}/events` | `?from=&to=` date filter |
-| Volunteers | `GET/POST /api/volunteers` | |
+| Volunteers | `GET/POST /api/volunteers` | `GET /api/organizations/{id}/volunteers` for org-scoped list; supports `contactPerson` + `areas` |
+| Volunteer areas | `GET/POST /api/organizations/{id}/volunteer-areas` | Org-scoped lookup (Construction, Cooking Crew, etc.); lazily seeded with 7 starter areas on first request; `POST /api/volunteer-areas` to add more |
 | Volunteer hours | `GET/POST /api/volunteers/{id}/hours` | `GET …/total-approved` |
 | Accounts | `GET/POST /api/accounts` | `GET /api/organizations/{id}/accounts/roots` |
 | Journal entries | `GET/POST /api/journal-entries` | `POST …/{id}/post?approvedBy=` |
@@ -386,3 +389,8 @@ Pagination is available on all list endpoints via `?page=0&size=20&sort=field,as
 | V24 | `bank_transaction` |
 | V25 | `bank_reconciliation` (`difference` is a MySQL generated column) |
 | V26 | `reconciliation_item` |
+| V32 | `volunteer.contact_person_id` (nullable FK to `person`, `ON DELETE SET NULL`) |
+| V33 | `volunteer_area` (org-scoped lookup) |
+| V34 | `volunteer_area_assignment` (many-to-many join, `volunteer` ↔ `volunteer_area`) |
+
+> **Gap between V26 and V32:** this branch (`feature/volunteer`) forked before V27–V31 (membership `can_vote`, `app_setting`, `meeting_minutes`, `action_item`, `gmail_settings`) landed on another branch — those migrations don't exist here. V32 was chosen to stay clear of that range on any shared dev database that already has them applied; see "Adding a new migration" above.

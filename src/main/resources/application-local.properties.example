@@ -14,6 +14,11 @@ spring.datasource.url=jdbc:mysql://localhost:3306/svirerp?useSSL=false&serverTim
 spring.datasource.username=YOUR_DB_USER
 spring.datasource.password=YOUR_DB_PASSWORD
 
+# Uncomment if your local svirerp database was previously migrated by a different branch
+# that added migrations not present in the branch you're currently on — Flyway will
+# otherwise fail with "Detected applied migration not resolved locally" for those versions.
+# spring.flyway.ignore-migration-patterns=*:missing
+
 # Google OAuth2 client for LOCAL DEVELOPMENT — create a separate dev-only
 # OAuth Client in Google Cloud Console (redirect URI
 # http://localhost:8080/login/oauth2/code/google). Do not reuse the

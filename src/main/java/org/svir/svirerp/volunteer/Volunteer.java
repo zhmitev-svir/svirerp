@@ -7,6 +7,8 @@ import org.svir.svirerp.organization.Organization;
 import org.svir.svirerp.person.Person;
 
 import java.time.LocalDate;
+import java.util.HashSet;
+import java.util.Set;
 import java.util.UUID;
 
 /** Volunteer roster entry linking a Person to the Organisation. */
@@ -29,10 +31,22 @@ public class Volunteer {
     @JoinColumn(name = "person_id", nullable = false)
     private Person person;
 
+    /** Optional alternate contact (e.g. family member or coordinator) to reach about this volunteer. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "contact_person_id")
+    private Person contactPerson;
+
     @NotNull
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "org_id", nullable = false)
     private Organization org;
+
+    @ManyToMany(fetch = FetchType.LAZY)
+    @JoinTable(name = "volunteer_area_assignment",
+        joinColumns = @JoinColumn(name = "volunteer_id"),
+        inverseJoinColumns = @JoinColumn(name = "area_id"))
+    @Builder.Default
+    private Set<VolunteerArea> areas = new HashSet<>();
 
     @NotNull
     @Column(name = "onboard_date", nullable = false)

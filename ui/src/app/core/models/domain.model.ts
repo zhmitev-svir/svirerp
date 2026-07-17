@@ -150,13 +150,25 @@ export interface EventResource {
 }
 
 // ─── Volunteers ──────────────────────────────────────────────────────────────
+export interface VolunteerArea {
+  id: string;
+  org: Organization;
+  name: string;
+  description?: string;
+  isActive?: boolean;
+}
+
 export interface Volunteer {
   id: string;
-  personId: string;
-  orgId: string;
-  skills?: string;
+  person: Person;
+  org: Organization;
+  contactPerson?: Person;
+  onboardDate: string;
   isActive?: boolean;
-  startDate?: string;
+  skills?: string;
+  availability?: string;
+  notes?: string;
+  areas?: VolunteerArea[];
 }
 
 export interface VolunteerHour {
