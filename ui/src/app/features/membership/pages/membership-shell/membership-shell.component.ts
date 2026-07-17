@@ -17,6 +17,10 @@ import { MatTabsModule } from '@angular/material/tabs';
          [active]="typesActive.isActive">
         Membership Types
       </a>
+      <a mat-tab-link routerLink="contributions" routerLinkActive #contributionsActive="routerLinkActive"
+         [active]="contributionsActive.isActive">
+        Contributions
+      </a>
     </nav>
     <mat-tab-nav-panel #tabPanel>
       <router-outlet />

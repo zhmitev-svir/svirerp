@@ -23,6 +23,20 @@ export const membershipRoutes: Routes = [
             m => m.MemberListComponent,
           ),
       },
+      {
+        path: 'members/:id',
+        loadComponent: () =>
+          import('./pages/member-detail/member-detail.component').then(
+            m => m.MemberDetailComponent,
+          ),
+      },
+      {
+        path: 'contributions',
+        loadComponent: () =>
+          import('./pages/member-payment-list/member-payment-list.component').then(
+            m => m.MemberPaymentListComponent,
+          ),
+      },
     ],
   },
 ];

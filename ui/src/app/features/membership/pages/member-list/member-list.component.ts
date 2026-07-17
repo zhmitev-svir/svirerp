@@ -1,6 +1,7 @@
 import { Component, inject, signal, OnInit, ChangeDetectionStrategy } from '@angular/core';
 import { PageEvent } from '@angular/material/paginator';
 import { MatDialog } from '@angular/material/dialog';
+import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatFormFieldModule } from '@angular/material/form-field';
@@ -74,6 +75,7 @@ export class MemberListComponent implements OnInit {
   private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
+  private router = inject(Router);
 
   private orgId: string | null = null;
   page = signal<Page<Member> | null>(null);
@@ -93,6 +95,7 @@ export class MemberListComponent implements OnInit {
   ];
 
   readonly actions: TableAction[] = [
+    { icon: 'open_in_new', label: 'View', action: (m: Member) => this.openDetail(m) },
     { icon: 'edit', label: 'Edit', action: (m: Member) => this.openForm(m) },
     { icon: 'delete', label: 'Delete', action: (m: Member) => this.confirmDelete(m) },
   ];
@@ -109,6 +112,10 @@ export class MemberListComponent implements OnInit {
   onFilterChange(): void {
     this.pageParams.set({ ...this.pageParams(), page: 0 });
     this.loadPage();
+  }
+
+  openDetail(member: Member): void {
+    this.router.navigate(['/membership/members', member.id]);
   }
 
   openForm(member?: Member): void {

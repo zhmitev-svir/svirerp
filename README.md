@@ -379,7 +379,7 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | Membership types | `GET /api/organizations/{id}/membership-types` | `POST/PUT /api/membership-types[/{id}]`, `DELETE /api/membership-types/{id}` |
 | Members | `GET /api/organizations/{id}/members` | `POST/PUT /api/members[/{id}]`, `DELETE`, `GET .../expired` |
 | Member CSV import | `GET /api/organizations/{id}/members/import-template` | `POST .../members/import` (multipart CSV, best-effort per-row) |
-| Member payments | `GET/POST /api/member-payments` | |
+| Member contributions | `GET /api/organizations/{id}/member-payments` | `?fromDate=` filter; `POST/PUT /api/member-payments[/{id}]`, `DELETE`; per-member history at `GET /api/members/{memberId}/payments` |
 | Trustees | `GET /api/organizations/{id}/trustees` | `POST/PUT /api/trustees[/{id}]`, `DELETE`, `POST .../{id}/renew` (re-elects for a fresh 2-year term) |
 | Committees | `GET/POST /api/committees` | |
 | Meeting minutes | `GET /api/organizations/{id}/meeting-minutes` | `POST/PUT /api/meeting-minutes[/{id}]`, `DELETE` (cascades to its action items); org-level board/trustee meetings, not tied to a committee |

@@ -7,11 +7,13 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -103,6 +105,13 @@ public class MembershipController {
     }
 
     // ── MemberPayment ────────────────────────────────────────────────────────
+
+    @GetMapping("/api/organizations/{orgId}/member-payments")
+    public Page<MemberPayment> listPaymentsForOrg(@PathVariable UUID orgId,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate fromDate,
+            Pageable pageable) {
+        return service.findPaymentsByOrg(orgId, fromDate, pageable);
+    }
 
     @GetMapping("/api/members/{memberId}/payments")
     public Page<MemberPayment> listPayments(@PathVariable UUID memberId, Pageable pageable) {

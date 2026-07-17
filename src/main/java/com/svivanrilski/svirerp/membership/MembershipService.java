@@ -195,6 +195,13 @@ public class MembershipService {
         return paymentRepo.findByMemberId(memberId, pageable);
     }
 
+    public Page<MemberPayment> findPaymentsByOrg(UUID orgId, LocalDate fromDate, Pageable pageable) {
+        if (fromDate == null) {
+            return paymentRepo.findByMemberOrgId(orgId, pageable);
+        }
+        return paymentRepo.findByMemberOrgIdAndPaymentDateGreaterThanEqual(orgId, fromDate, pageable);
+    }
+
     public MemberPayment findPaymentById(UUID id) {
         return paymentRepo.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("MemberPayment", id));

@@ -70,12 +70,15 @@ export interface Member {
 
 export interface MemberPayment {
   id: string;
-  memberId: string;
-  amountPaid: number;
+  member: Member;
+  amount: number;
   paymentDate: string;
-  paymentMethod: 'cash' | 'check' | 'credit_card' | 'ach' | 'online' | 'other';
+  paymentMethod?: 'cash' | 'check' | 'credit_card' | 'ach' | 'online' | 'other';
+  transactionRef?: string;
+  periodStart?: string;
+  periodEnd?: string;
   status: 'pending' | 'completed' | 'failed' | 'refunded';
-  referenceNumber?: string;
+  notes?: string;
 }
 
 // ─── Governance ─────────────────────────────────────────────────────────────
