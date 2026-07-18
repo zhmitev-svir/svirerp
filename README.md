@@ -15,9 +15,10 @@ Non-profit ERP system for the SVIR organization — Spring Boot 3 REST API backe
 7. [Building](#building)
 8. [Database Migrations](#database-migrations)
 9. [Running the API](#running-the-api)
-10. [Angular UI](#angular-ui)
-11. [API Overview](#api-overview)
-12. [Migration Reference](#migration-reference)
+10. [Production Access](#production-access)
+11. [Angular UI](#angular-ui)
+12. [API Overview](#api-overview)
+13. [Migration Reference](#migration-reference)
 
 ---
 
@@ -53,7 +54,7 @@ svirerp/
 │       └── resources/
 │           ├── application.properties              # Base config (env-var placeholders)
 │           ├── application-local.properties.example  # Copy & fill for local dev
-│           └── db/migration/                       # Flyway V1–V35 SQL scripts
+│           └── db/migration/                       # Flyway V1–V38 SQL scripts
 ├── ui/                          # Angular 21 front-end (see Angular UI section)
 ├── mvnw                         # Unix Maven Wrapper
 ├── mvnw.cmd                     # Windows Maven Wrapper
@@ -309,7 +310,7 @@ The Flyway Maven plugin lets you apply or inspect migrations without starting th
 
 ### Adding a new migration
 
-1. Create `src/main/resources/db/migration/V35__your_description.sql` (check `db/migration/` for the current highest version first — don't assume it matches this doc)
+1. Create `src/main/resources/db/migration/V39__your_description.sql` (check `db/migration/` for the current highest version first — don't assume it matches this doc)
 2. Write your `ALTER TABLE` / `CREATE TABLE` / etc.
 3. Update the corresponding JPA entity
 4. Restart the app (or run `./mvnw flyway:migrate`) — Flyway applies it automatically
@@ -347,6 +348,24 @@ java -jar target/svirerp-1.0.0-SNAPSHOT.jar
 ```
 
 The API starts at `http://localhost:8080` (or `--server.port` value). All REST endpoints are under `/api/`.
+
+---
+
+## Production Access
+
+`https://svirerp.svivanrilski.com` is the public URL for the running app. TLS termination and reverse proxying are handled by a **Caddy** instance (not part of this repo) running as a Windows service on the host machine, config at `H:\caddy-w\Caddyfile`:
+
+```
+svirerp.svivanrilski.com {
+	reverse_proxy 172.21.43.55:8080
+}
+```
+
+Caddy obtains and renews the Let's Encrypt certificate automatically — no cert files or manual renewal needed. This is the same Caddy instance already fronting `app.svivanrilski.com` (a separate ERPNext installation, unrelated to this app), just with an additional site block.
+
+The app itself currently runs inside a WSL2 VM rather than natively on Windows, so the reverse-proxy target above is the VM's internal IP rather than `127.0.0.1` (WSL2's `localhostForwarding` only relays WSL ports to Windows' IPv6 loopback, not the IPv4 loopback Caddy would otherwise use). Because that internal IP changes on every WSL restart, a scheduled task (**"Update WSL IP for Caddy"**, running `H:\caddy-w\update-wsl-ip.ps1`) periodically rewrites any `172.x.x.x` address found anywhere in the Caddyfile to the VM's current IP and reloads Caddy — this keeps the `svirerp.svivanrilski.com` block in sync automatically alongside the pre-existing `app.svivanrilski.com` one, with no per-domain wiring needed.
+
+Reloading after a manual Caddyfile edit: `caddy reload --config H:\caddy-w\Caddyfile` (or restart the `caddy` Windows service).
 
 ---
 
@@ -391,8 +410,12 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | Volunteers | `GET/POST /api/volunteers` | `GET /api/organizations/{id}/volunteers` for org-scoped list; supports `contactPerson` + `areas` |
 | Volunteer areas | `GET/POST /api/organizations/{id}/volunteer-areas` | Org-scoped lookup (Construction, Cooking Crew, etc.); lazily seeded with 7 starter areas on first request; `POST /api/volunteer-areas` to add more |
 | Volunteer hours | `GET/POST /api/volunteers/{id}/hours` | `GET …/total-approved` |
-| Accounts | `GET/POST /api/accounts` | `GET /api/organizations/{id}/accounts/roots` |
-| Journal entries | `GET/POST /api/journal-entries` | `POST …/{id}/post?approvedBy=` |
+| Funds (Projects) | `GET /api/organizations/{id}/funds` | `POST/PUT/DELETE /api/funds[/{id}]`; `GET /api/funds/{id}/summary` — opening balance, total income, total expense, balance for the "project financial status" view |
+| Accounts (Categories) | `GET /api/organizations/{id}/accounts` | `POST/PUT/DELETE /api/accounts[/{id}]`, `GET .../accounts/roots`; org's first request lazily seeds a default chart of accounts (see `FinanceService#seedDefaultChartOfAccounts`) |
+| Vendors | `GET /api/organizations/{id}/vendors` | `POST/PUT/DELETE /api/vendors[/{id}]` — payees for expenses |
+| Service requests | `GET /api/organizations/{id}/service-requests` | `POST/PUT/DELETE /api/service-requests[/{id}]`; `GET .../{id}/balance` — agreedAmount minus every posted payment tagged with the request |
+| Income / expense transactions | `POST /api/organizations/{id}/income-transactions` | `POST .../expense-transactions` — the simple Record Income/Record Expense flow; builds a balanced, immediately-posted 2-line `JournalEntry` behind the scenes, no debit/credit UI needed |
+| Journal entries | `GET /api/organizations/{id}/journal-entries` | `?fundId=&entryDateFrom=&entryDateTo=` filters; `POST/PUT /api/journal-entries[/{id}]`, `POST …/{id}/post?approvedBy=`, `GET …/{id}/lines` |
 | Bank accounts | `GET/POST /api/bank-accounts` | |
 | Reconciliations | `GET/POST /api/reconciliations` | |
 | App settings (admin) | `GET /api/settings` | `PUT /api/settings/{key}`; `ROLE_ADMIN` only, `SECRET` values never returned |
@@ -442,3 +465,6 @@ Pagination is available on all list endpoints via `?page=0&size=20&sort=field,as
 | V33 | `volunteer_area` (org-scoped lookup) |
 | V34 | `volunteer_area_assignment` (many-to-many join, `volunteer` ↔ `volunteer_area`) |
 | V35 | `calendar_event.publish_to_official`/`publish_to_internal` + their `google_*_event_id`/`google_*_sync_error` tracking columns; seeds `calendar.*` `app_setting` rows for the Google Calendar OAuth connection |
+| V36 | `vendor` (org-scoped payee list for expenses) |
+| V37 | `service_request` (pre-paid church services — weddings, baptisms, funerals, memorials — tracked independently of scheduling, optional FK to `church_event`) |
+| V38 | `journal_entry` transaction tags: `payment_method`, `check_number`, and nullable FKs `payer_id`→`person`, `vendor_id`→`vendor`, `service_request_id`→`service_request`, `category_account_id`/`fund_id`→`account`/`fund` — denormalized so the Finance transaction list doesn't need to join `journal_line` |

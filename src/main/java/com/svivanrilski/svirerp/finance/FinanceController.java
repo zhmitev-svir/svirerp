@@ -9,6 +9,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.UUID;
 
@@ -44,6 +45,12 @@ public class FinanceController {
     public ResponseEntity<Void> deleteFund(@PathVariable UUID id) {
         service.deleteFund(id);
         return ResponseEntity.noContent().build();
+    }
+
+    /** Powers the project/fund financial-status view: total income, total expense, and balance. */
+    @GetMapping("/api/funds/{id}/summary")
+    public FundSummary fundSummary(@PathVariable UUID id) {
+        return service.fundSummary(id);
     }
 
     // ── Account ──────────────────────────────────────────────────────────────
@@ -87,7 +94,20 @@ public class FinanceController {
     // ── JournalEntry ──────────────────────────────────────────────────────────
 
     @GetMapping("/api/organizations/{orgId}/journal-entries")
-    public Page<JournalEntry> listEntries(@PathVariable UUID orgId, Pageable pageable) {
+    public Page<JournalEntry> listEntries(@PathVariable UUID orgId,
+            @RequestParam(required = false) UUID fundId,
+            @RequestParam(required = false) LocalDate entryDateFrom,
+            @RequestParam(required = false) LocalDate entryDateTo,
+            Pageable pageable) {
+        if (fundId != null && entryDateFrom != null && entryDateTo != null) {
+            return service.findEntriesByOrgAndFundAndDateRange(orgId, fundId, entryDateFrom, entryDateTo, pageable);
+        }
+        if (fundId != null) {
+            return service.findEntriesByOrgAndFund(orgId, fundId, pageable);
+        }
+        if (entryDateFrom != null && entryDateTo != null) {
+            return service.findEntriesByOrgAndDateRange(orgId, entryDateFrom, entryDateTo, pageable);
+        }
         return service.findEntriesByOrg(orgId, pageable);
     }
 
@@ -282,5 +302,86 @@ public class FinanceController {
     public ResponseEntity<Void> deleteItem(@PathVariable UUID id) {
         service.deleteItem(id);
         return ResponseEntity.noContent().build();
+    }
+
+    // ── Vendor ───────────────────────────────────────────────────────────────
+
+    @GetMapping("/api/organizations/{orgId}/vendors")
+    public Page<Vendor> listVendors(@PathVariable UUID orgId, Pageable pageable) {
+        return service.findVendorsByOrg(orgId, pageable);
+    }
+
+    @GetMapping("/api/vendors/{id}")
+    public Vendor getVendor(@PathVariable UUID id) {
+        return service.findVendorById(id);
+    }
+
+    @PostMapping("/api/vendors")
+    public ResponseEntity<Vendor> createVendor(@Valid @RequestBody Vendor vendor) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.createVendor(vendor));
+    }
+
+    @PutMapping("/api/vendors/{id}")
+    public Vendor updateVendor(@PathVariable UUID id, @Valid @RequestBody Vendor vendor) {
+        return service.updateVendor(id, vendor);
+    }
+
+    @DeleteMapping("/api/vendors/{id}")
+    public ResponseEntity<Void> deleteVendor(@PathVariable UUID id) {
+        service.deleteVendor(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // ── ServiceRequest ───────────────────────────────────────────────────────
+
+    @GetMapping("/api/organizations/{orgId}/service-requests")
+    public Page<ServiceRequest> listServiceRequests(@PathVariable UUID orgId, Pageable pageable) {
+        return service.findServiceRequestsByOrg(orgId, pageable);
+    }
+
+    @GetMapping("/api/service-requests/{id}")
+    public ServiceRequest getServiceRequest(@PathVariable UUID id) {
+        return service.findServiceRequestById(id);
+    }
+
+    @PostMapping("/api/service-requests")
+    public ResponseEntity<ServiceRequest> createServiceRequest(@Valid @RequestBody ServiceRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.createServiceRequest(request));
+    }
+
+    @PutMapping("/api/service-requests/{id}")
+    public ServiceRequest updateServiceRequest(@PathVariable UUID id, @Valid @RequestBody ServiceRequest request) {
+        return service.updateServiceRequest(id, request);
+    }
+
+    @DeleteMapping("/api/service-requests/{id}")
+    public ResponseEntity<Void> deleteServiceRequest(@PathVariable UUID id) {
+        service.deleteServiceRequest(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/api/service-requests/{id}/balance")
+    public BigDecimal serviceRequestBalance(@PathVariable UUID id) {
+        return service.serviceRequestBalance(id);
+    }
+
+    // ── Record Income / Record Expense ──────────────────────────────────────
+
+    @PostMapping("/api/organizations/{orgId}/income-transactions")
+    public ResponseEntity<JournalEntry> recordIncome(@PathVariable UUID orgId,
+            @RequestBody RecordIncomeRequest body) {
+        RecordIncomeRequest req = new RecordIncomeRequest(orgId, body.entryDate(), body.amount(),
+                body.description(), body.categoryAccountId(), body.depositAccountId(), body.fundId(),
+                body.payerId(), body.serviceRequestId(), body.paymentMethod(), body.checkNumber());
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.recordIncome(req));
+    }
+
+    @PostMapping("/api/organizations/{orgId}/expense-transactions")
+    public ResponseEntity<JournalEntry> recordExpense(@PathVariable UUID orgId,
+            @RequestBody RecordExpenseRequest body) {
+        RecordExpenseRequest req = new RecordExpenseRequest(orgId, body.entryDate(), body.amount(),
+                body.description(), body.categoryAccountId(), body.paymentAccountId(), body.fundId(),
+                body.vendorId(), body.paymentMethod(), body.checkNumber());
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.recordExpense(req));
     }
 }

@@ -252,85 +252,185 @@ export interface VolunteerHour {
 // ─── Finance ─────────────────────────────────────────────────────────────────
 export interface Fund {
   id: string;
-  orgId: string;
-  name: string;
+  org: Organization;
+  fundName: string;
+  fundCode: string;
+  fundType: 'unrestricted' | 'temporarily_restricted' | 'permanently_restricted';
   description?: string;
   isRestricted?: boolean;
+  restrictionPurpose?: string;
   isActive?: boolean;
+  openingBalance: number;
+}
+
+/** Powers the "project financial status" view — GET /api/funds/{id}/summary. */
+export interface FundSummary {
+  openingBalance: number;
+  totalIncome: number;
+  totalExpense: number;
+  balance: number;
 }
 
 export interface Account {
   id: string;
-  orgId: string;
-  code: string;
-  name: string;
+  org: Organization;
+  parentAccount?: Account;
+  accountNumber: string;
+  accountName: string;
   accountType: 'asset' | 'liability' | 'equity' | 'revenue' | 'expense';
-  parentAccountId?: string;
-  isSystem?: boolean;
+  accountSubtype?: string;
+  normalBalance: 'debit' | 'credit';
   isActive?: boolean;
+  isSystem?: boolean;
   description?: string;
+  createdAt?: string;
+}
+
+export interface Vendor {
+  id: string;
+  org: Organization;
+  name: string;
+  category?: string;
+  contactName?: string;
+  phone?: string;
+  email?: string;
+  addressLine1?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
+  notes?: string;
+  isActive?: boolean;
+  createdAt?: string;
+}
+
+export interface ServiceRequest {
+  id: string;
+  org: Organization;
+  requestorPerson?: Person;
+  serviceType: 'wedding' | 'baptism' | 'funeral' | 'memorial' | 'blessing' | 'other';
+  requestedDate?: string;
+  agreedAmount: number;
+  status: 'requested' | 'scheduled' | 'completed' | 'cancelled';
+  churchEvent?: ChurchEvent;
+  notes?: string;
+  createdAt?: string;
 }
 
 export interface JournalEntry {
   id: string;
-  orgId: string;
-  reference: string;
+  org: Organization;
+  createdBy?: Person;
+  approvedBy?: Person;
+  entryNumber?: string;
   entryDate: string;
   description?: string;
+  reference?: string;
+  entryType: 'general' | 'adjusting' | 'closing' | 'reversing' | 'opening';
   status: 'draft' | 'posted' | 'void';
-  createdById?: string;
-  approvedById?: string;
+  totalDebit: number;
+  totalCredit: number;
+  // Transaction tags set by the Record Income / Record Expense flow — see RecordIncomeRequest /
+  // RecordExpenseRequest. Denormalized for the transaction list; the ledger truth is the lines below.
+  paymentMethod?: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other';
+  checkNumber?: string;
+  payer?: Person;
+  vendor?: Vendor;
+  serviceRequest?: ServiceRequest;
+  categoryAccount?: Account;
+  fund?: Fund;
   createdAt?: string;
+  approvedAt?: string;
+}
+
+export interface RecordIncomeRequest {
+  entryDate: string;
+  amount: number;
+  description?: string;
+  categoryAccountId: string;
+  depositAccountId: string;
+  fundId?: string;
+  payerId?: string;
+  serviceRequestId?: string;
+  paymentMethod: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other';
+  checkNumber?: string;
+}
+
+export interface RecordExpenseRequest {
+  entryDate: string;
+  amount: number;
+  description?: string;
+  categoryAccountId: string;
+  paymentAccountId: string;
+  fundId?: string;
+  vendorId?: string;
+  paymentMethod: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other';
+  checkNumber?: string;
 }
 
 export interface JournalLine {
   id: string;
-  journalEntryId: string;
-  accountId: string;
-  fundId?: string;
-  debit: number;
-  credit: number;
+  journalEntry: JournalEntry;
+  account: Account;
+  fund?: Fund;
+  debitAmount: number;
+  creditAmount: number;
   memo?: string;
 }
 
 export interface BankAccount {
   id: string;
-  orgId: string;
-  accountId?: string;
+  org: Organization;
+  glAccount: Account;
   institutionName: string;
   accountName: string;
-  accountNumber: string;
-  routingNumber?: string;
-  accountType: 'checking' | 'savings' | 'money_market' | 'other';
+  accountNumberMasked?: string;
+  routingNumberMasked?: string;
+  accountType: 'checking' | 'savings' | 'money_market' | 'cd' | 'investment';
+  currency?: string;
+  currentBalance: number;
+  openedDate?: string;
   isActive?: boolean;
+  isPrimary?: boolean;
+  contactName?: string;
+  contactPhone?: string;
+  notes?: string;
+  updatedAt?: string;
 }
 
 export interface BankTransaction {
   id: string;
-  bankAccountId: string;
+  bankAccount: BankAccount;
+  journalEntry?: JournalEntry;
+  transactionRef?: string;
   transactionDate: string;
+  postedDate?: string;
   amount: number;
   transactionType: 'debit' | 'credit' | 'check' | 'transfer' | 'fee' | 'interest' | 'other';
   description?: string;
+  payee?: string;
+  checkNumber?: string;
   status: 'pending' | 'cleared' | 'void';
   isReconciled?: boolean;
+  importedAt?: string;
 }
 
 export interface BankReconciliation {
   id: string;
-  bankAccountId: string;
+  bankAccount: BankAccount;
+  reconciledBy?: Person;
   statementDate: string;
   statementBalance: number;
   bookBalance: number;
   difference?: number;
   status: 'in_progress' | 'completed' | 'discrepancy';
   reconciledAt?: string;
+  notes?: string;
 }
 
 export interface ReconciliationItem {
   id: string;
-  reconciliationId: string;
-  bankTransactionId: string;
+  reconciliation: BankReconciliation;
+  bankTransaction: BankTransaction;
   isCleared: boolean;
   itemType: 'transaction' | 'deposit_in_transit' | 'outstanding_check' | 'adjustment';
   notes?: string;

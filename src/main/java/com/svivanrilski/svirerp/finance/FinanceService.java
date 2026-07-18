@@ -7,12 +7,14 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.svivanrilski.svirerp.common.ResourceNotFoundException;
+import com.svivanrilski.svirerp.event.EventService;
 import com.svivanrilski.svirerp.organization.Organization;
 import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.Person;
 import com.svivanrilski.svirerp.person.PersonService;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Set;
@@ -40,6 +42,35 @@ public class FinanceService {
             Set.of("transaction", "deposit_in_transit", "outstanding_check", "adjustment");
     private static final Set<String> BUDGET_PERIODS =
             Set.of("annual", "q1", "q2", "q3", "q4", "monthly");
+    private static final Set<String> PAYMENT_METHODS =
+            Set.of("cash", "check", "zeffy", "bank_transfer", "card", "other");
+    private static final Set<String> SERVICE_TYPES =
+            Set.of("wedding", "baptism", "funeral", "memorial", "blessing", "other");
+    private static final Set<String> SERVICE_REQUEST_STATUSES =
+            Set.of("requested", "scheduled", "completed", "cancelled");
+
+    /** account_number, account_name, account_type — seeded lazily on an org's first accounts request. */
+    private static final String[][] DEFAULT_ACCOUNTS = {
+        {"1000", "Cash on Hand", "asset"},
+        {"1010", "Checking Account", "asset"},
+        {"3000", "Net Assets", "equity"},
+        {"4000", "Membership Dues Income", "revenue"},
+        {"4010", "Donation Income", "revenue"},
+        {"4020", "Fundraising Income", "revenue"},
+        {"4030", "Service Fees Income", "revenue"},
+        {"4090", "Other Income", "revenue"},
+        {"5000", "Insurance Expense", "expense"},
+        {"5010", "Utilities Expense", "expense"},
+        {"5020", "Office Supplies Expense", "expense"},
+        {"5030", "Candles & Church Supplies Expense", "expense"},
+        {"5100", "Priest Compensation", "expense"},
+        {"5110", "Priest Housing Expense", "expense"},
+        {"5200", "Event Food & Beverage Expense", "expense"},
+        {"5210", "Event Services Expense", "expense"},
+        {"5300", "Construction & Repairs Expense", "expense"},
+        {"5310", "Consulting & Professional Fees Expense", "expense"},
+        {"5900", "Other Expense", "expense"},
+    };
 
     private final FundRepository fundRepo;
     private final AccountRepository accountRepo;
@@ -50,8 +81,11 @@ public class FinanceService {
     private final BankTransactionRepository bankTxRepo;
     private final BankReconciliationRepository reconciliationRepo;
     private final ReconciliationItemRepository reconItemRepo;
+    private final VendorRepository vendorRepo;
+    private final ServiceRequestRepository serviceRequestRepo;
     private final OrganizationService orgService;
     private final PersonService personService;
+    private final EventService eventService;
     private final EntityManager entityManager;
 
     // ── Fund ─────────────────────────────────────────────────────────────────
@@ -96,13 +130,46 @@ public class FinanceService {
 
     // ── Account ──────────────────────────────────────────────────────────────
 
+    /** Not read-only: may lazily seed a default chart of accounts on an org's first request. */
+    @Transactional
     public Page<Account> findAccountsByOrg(UUID orgId, Pageable pageable) {
-        return accountRepo.findByOrgId(orgId, pageable);
+        Page<Account> page = accountRepo.findByOrgId(orgId, pageable);
+        if (page.isEmpty() && pageable.getPageNumber() == 0) {
+            seedDefaultChartOfAccounts(orgId);
+            page = accountRepo.findByOrgId(orgId, pageable);
+        }
+        return page;
     }
 
     /** Returns root accounts; clients can traverse childAccounts for the full hierarchy. */
+    @Transactional
     public List<Account> findRootAccounts(UUID orgId) {
-        return accountRepo.findByOrgIdAndParentAccountIsNull(orgId);
+        List<Account> accounts = accountRepo.findByOrgIdAndParentAccountIsNull(orgId);
+        if (accounts.isEmpty()) {
+            seedDefaultChartOfAccounts(orgId);
+            accounts = accountRepo.findByOrgIdAndParentAccountIsNull(orgId);
+        }
+        return accounts;
+    }
+
+    private void seedDefaultChartOfAccounts(UUID orgId) {
+        Organization org = orgService.findById(orgId);
+        for (String[] def : DEFAULT_ACCOUNTS) {
+            if (!accountRepo.existsByOrgIdAndAccountNumber(orgId, def[0])) {
+                String accountType = def[2];
+                String normalBalance = "asset".equals(accountType) || "expense".equals(accountType)
+                        ? "debit" : "credit";
+                accountRepo.save(Account.builder()
+                        .org(org)
+                        .accountNumber(def[0])
+                        .accountName(def[1])
+                        .accountType(accountType)
+                        .normalBalance(normalBalance)
+                        .isActive(true)
+                        .isSystem(false)
+                        .build());
+            }
+        }
     }
 
     public Account findAccountById(UUID id) {
@@ -152,6 +219,20 @@ public class FinanceService {
 
     public Page<JournalEntry> findEntriesByOrg(UUID orgId, Pageable pageable) {
         return journalEntryRepo.findByOrgId(orgId, pageable);
+    }
+
+    public Page<JournalEntry> findEntriesByOrgAndFund(UUID orgId, UUID fundId, Pageable pageable) {
+        return journalEntryRepo.findByOrgIdAndFundId(orgId, fundId, pageable);
+    }
+
+    public Page<JournalEntry> findEntriesByOrgAndDateRange(UUID orgId, LocalDate from, LocalDate to,
+            Pageable pageable) {
+        return journalEntryRepo.findByOrgIdAndEntryDateBetween(orgId, from, to, pageable);
+    }
+
+    public Page<JournalEntry> findEntriesByOrgAndFundAndDateRange(UUID orgId, UUID fundId, LocalDate from,
+            LocalDate to, Pageable pageable) {
+        return journalEntryRepo.findByOrgIdAndFundIdAndEntryDateBetween(orgId, fundId, from, to, pageable);
     }
 
     public JournalEntry findEntryById(UUID id) {
@@ -482,10 +563,213 @@ public class FinanceService {
         reconItemRepo.deleteById(id);
     }
 
+    // ── Vendor ───────────────────────────────────────────────────────────────
+
+    public Page<Vendor> findVendorsByOrg(UUID orgId, Pageable pageable) {
+        return vendorRepo.findByOrgId(orgId, pageable);
+    }
+
+    public Vendor findVendorById(UUID id) {
+        return vendorRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Vendor", id));
+    }
+
+    @Transactional
+    public Vendor createVendor(Vendor vendor) {
+        Organization org = orgService.findById(vendor.getOrg().getId());
+        vendor.setOrg(org);
+        return vendorRepo.save(vendor);
+    }
+
+    @Transactional
+    public Vendor updateVendor(UUID id, Vendor patch) {
+        Vendor existing = findVendorById(id);
+        existing.setName(patch.getName());
+        existing.setCategory(patch.getCategory());
+        existing.setContactName(patch.getContactName());
+        existing.setPhone(patch.getPhone());
+        existing.setEmail(patch.getEmail());
+        existing.setAddressLine1(patch.getAddressLine1());
+        existing.setCity(patch.getCity());
+        existing.setState(patch.getState());
+        existing.setZip(patch.getZip());
+        existing.setNotes(patch.getNotes());
+        existing.setIsActive(patch.getIsActive());
+        return vendorRepo.save(existing);
+    }
+
+    @Transactional
+    public void deleteVendor(UUID id) {
+        if (!vendorRepo.existsById(id)) throw new ResourceNotFoundException("Vendor", id);
+        vendorRepo.deleteById(id);
+    }
+
+    // ── ServiceRequest ───────────────────────────────────────────────────────
+
+    public Page<ServiceRequest> findServiceRequestsByOrg(UUID orgId, Pageable pageable) {
+        return serviceRequestRepo.findByOrgId(orgId, pageable);
+    }
+
+    public ServiceRequest findServiceRequestById(UUID id) {
+        return serviceRequestRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ServiceRequest", id));
+    }
+
+    @Transactional
+    public ServiceRequest createServiceRequest(ServiceRequest request) {
+        validate(SERVICE_TYPES, request.getServiceType(), "service type");
+        validate(SERVICE_REQUEST_STATUSES, request.getStatus(), "service request status");
+        Organization org = orgService.findById(request.getOrg().getId());
+        request.setOrg(org);
+        if (request.getRequestorPerson() != null) {
+            request.setRequestorPerson(personService.findById(request.getRequestorPerson().getId()));
+        }
+        if (request.getChurchEvent() != null) {
+            request.setChurchEvent(eventService.findChurchEventById(request.getChurchEvent().getId()));
+        }
+        return serviceRequestRepo.save(request);
+    }
+
+    @Transactional
+    public ServiceRequest updateServiceRequest(UUID id, ServiceRequest patch) {
+        validate(SERVICE_TYPES, patch.getServiceType(), "service type");
+        validate(SERVICE_REQUEST_STATUSES, patch.getStatus(), "service request status");
+        ServiceRequest existing = findServiceRequestById(id);
+        if (patch.getRequestorPerson() != null) {
+            existing.setRequestorPerson(personService.findById(patch.getRequestorPerson().getId()));
+        } else {
+            existing.setRequestorPerson(null);
+        }
+        existing.setServiceType(patch.getServiceType());
+        existing.setRequestedDate(patch.getRequestedDate());
+        existing.setAgreedAmount(patch.getAgreedAmount());
+        existing.setStatus(patch.getStatus());
+        if (patch.getChurchEvent() != null) {
+            existing.setChurchEvent(eventService.findChurchEventById(patch.getChurchEvent().getId()));
+        } else {
+            existing.setChurchEvent(null);
+        }
+        existing.setNotes(patch.getNotes());
+        return serviceRequestRepo.save(existing);
+    }
+
+    @Transactional
+    public void deleteServiceRequest(UUID id) {
+        if (!serviceRequestRepo.existsById(id)) throw new ResourceNotFoundException("ServiceRequest", id);
+        serviceRequestRepo.deleteById(id);
+    }
+
+    /** Amount still owed: agreedAmount minus every posted income entry tagged with this request. */
+    public BigDecimal serviceRequestBalance(UUID serviceRequestId) {
+        ServiceRequest request = findServiceRequestById(serviceRequestId);
+        BigDecimal paid = journalEntryRepo.sumPaidForServiceRequest(serviceRequestId);
+        return request.getAgreedAmount().subtract(paid);
+    }
+
+    // ── Record Income / Record Expense ──────────────────────────────────────
+    // Simple transaction entry points: build a balanced, immediately-posted 2-line JournalEntry
+    // (no draft/approval step — see FinanceService class docs / the Finance Phase 1 plan) so a
+    // treasurer never has to think in debits and credits.
+
+    @Transactional
+    public JournalEntry recordIncome(RecordIncomeRequest req) {
+        validate(PAYMENT_METHODS, req.paymentMethod(), "payment method");
+        Organization org = orgService.findById(req.orgId());
+        Account category = findAccountById(req.categoryAccountId());
+        requireAccountType(category, "revenue", "Income category account");
+        Account deposit = findAccountById(req.depositAccountId());
+        requireAccountType(deposit, "asset", "Deposit account");
+        Fund fund = req.fundId() != null ? findFundById(req.fundId()) : null;
+        Person payer = req.payerId() != null ? personService.findById(req.payerId()) : null;
+        ServiceRequest serviceRequest = req.serviceRequestId() != null
+                ? findServiceRequestById(req.serviceRequestId()) : null;
+
+        JournalEntry entry = journalEntryRepo.save(JournalEntry.builder()
+                .org(org)
+                .entryDate(req.entryDate())
+                .description(req.description())
+                .entryType("general")
+                .status("draft")
+                .totalDebit(req.amount())
+                .totalCredit(req.amount())
+                .paymentMethod(req.paymentMethod())
+                .checkNumber(req.checkNumber())
+                .payer(payer)
+                .serviceRequest(serviceRequest)
+                .categoryAccount(category)
+                .fund(fund)
+                .build());
+
+        journalLineRepo.save(JournalLine.builder()
+                .journalEntry(entry).account(deposit).fund(fund)
+                .debitAmount(req.amount()).creditAmount(BigDecimal.ZERO)
+                .memo(req.description()).build());
+        journalLineRepo.save(JournalLine.builder()
+                .journalEntry(entry).account(category).fund(fund)
+                .debitAmount(BigDecimal.ZERO).creditAmount(req.amount())
+                .memo(req.description()).build());
+
+        return postEntry(entry.getId(), null);
+    }
+
+    @Transactional
+    public JournalEntry recordExpense(RecordExpenseRequest req) {
+        validate(PAYMENT_METHODS, req.paymentMethod(), "payment method");
+        Organization org = orgService.findById(req.orgId());
+        Account category = findAccountById(req.categoryAccountId());
+        requireAccountType(category, "expense", "Expense category account");
+        Account payment = findAccountById(req.paymentAccountId());
+        requireAccountType(payment, "asset", "Payment account");
+        Fund fund = req.fundId() != null ? findFundById(req.fundId()) : null;
+        Vendor vendor = req.vendorId() != null ? findVendorById(req.vendorId()) : null;
+
+        JournalEntry entry = journalEntryRepo.save(JournalEntry.builder()
+                .org(org)
+                .entryDate(req.entryDate())
+                .description(req.description())
+                .entryType("general")
+                .status("draft")
+                .totalDebit(req.amount())
+                .totalCredit(req.amount())
+                .paymentMethod(req.paymentMethod())
+                .checkNumber(req.checkNumber())
+                .vendor(vendor)
+                .categoryAccount(category)
+                .fund(fund)
+                .build());
+
+        journalLineRepo.save(JournalLine.builder()
+                .journalEntry(entry).account(category).fund(fund)
+                .debitAmount(req.amount()).creditAmount(BigDecimal.ZERO)
+                .memo(req.description()).build());
+        journalLineRepo.save(JournalLine.builder()
+                .journalEntry(entry).account(payment).fund(fund)
+                .debitAmount(BigDecimal.ZERO).creditAmount(req.amount())
+                .memo(req.description()).build());
+
+        return postEntry(entry.getId(), null);
+    }
+
+    private void requireAccountType(Account account, String expectedType, String label) {
+        if (!expectedType.equals(account.getAccountType())) {
+            throw new IllegalArgumentException(label + " must be a '" + expectedType
+                    + "' account (got '" + account.getAccountType() + "')");
+        }
+    }
+
     // ── Reporting helpers ─────────────────────────────────────────────────────
 
     public BigDecimal accountBalance(UUID accountId) {
         return journalLineRepo.netBalanceForAccount(accountId);
+    }
+
+    /** Powers the "project financial status" view: a fund's total income, total expense, and balance. */
+    public FundSummary fundSummary(UUID fundId) {
+        Fund fund = findFundById(fundId);
+        BigDecimal totalIncome = journalLineRepo.netAmountForFundAndAccountType(fundId, "revenue").negate();
+        BigDecimal totalExpense = journalLineRepo.netAmountForFundAndAccountType(fundId, "expense");
+        BigDecimal balance = fund.getOpeningBalance().add(totalIncome).subtract(totalExpense);
+        return new FundSummary(fund.getOpeningBalance(), totalIncome, totalExpense, balance);
     }
 
     // ── Internal validators ───────────────────────────────────────────────────

@@ -75,6 +75,41 @@ public class JournalEntry {
     @Column(name = "total_credit", nullable = false, precision = 15, scale = 2)
     private BigDecimal totalCredit = BigDecimal.ZERO;
 
+    // ── Transaction tags (set by FinanceService#recordIncome/#recordExpense) ───────────────────
+    // Denormalized so the transaction list can show category/fund/vendor/payer without joining
+    // journal_line; the ledger truth remains the JournalLine rows below.
+
+    /** Allowed values (DB CHECK): cash, check, zeffy, bank_transfer, card, other. */
+    @Column(name = "payment_method", length = 30)
+    private String paymentMethod;
+
+    @Column(name = "check_number", length = 20)
+    private String checkNumber;
+
+    /** The donor/payer for an income entry. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "payer_id")
+    private Person payer;
+
+    /** The payee for an expense entry. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "vendor_id")
+    private Vendor vendor;
+
+    /** Set when this entry is a payment toward a pre-paid church service. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "service_request_id")
+    private ServiceRequest serviceRequest;
+
+    /** The revenue/expense account on the non-cash side of a simple 2-line entry. */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "category_account_id")
+    private Account categoryAccount;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "fund_id")
+    private Fund fund;
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
 
