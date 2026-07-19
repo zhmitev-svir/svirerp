@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C \"H:/workspaces/svirerp\" add .gitignore .mvn/ mvnw mvnw.cmd pom.xml src/main/resources/application.properties src/main/resources/application-local.properties.example README.md)",
+      "Bash(git -C \"H:/workspaces/svirerp\" update-index --chmod=+x mvnw)",
+      "Bash(git -C \"H:/workspaces/svirerp\" status --short)",
+      "Bash(git *)",
+      "Bash(wsl.exe *)"
+    ]
+  }
+}
