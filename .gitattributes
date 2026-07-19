@@ -1,0 +1,4 @@
+# Normalize all text files to LF in the repository and on checkout, regardless
+# of each contributor's core.autocrlf setting. text=auto lets Git still detect
+# genuinely binary files (images, jars, etc.) and leave them untouched.
+* text=auto eol=lf
