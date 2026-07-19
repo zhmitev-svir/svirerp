@@ -1,5 +1,5 @@
 import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
-import { RouterOutlet } from '@angular/router';
+import { Router, RouterOutlet } from '@angular/router';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
 import { map } from 'rxjs/operators';
@@ -8,8 +8,10 @@ import { MatSidenavModule } from '@angular/material/sidenav';
 import { MatToolbarModule } from '@angular/material/toolbar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
+import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { NavComponent } from '../nav/nav.component';
+import { AuthService } from '../../core/services/auth.service';
 
 @Component({
   selector: 'app-shell',
@@ -21,6 +23,7 @@ import { NavComponent } from '../nav/nav.component';
     MatToolbarModule,
     MatIconModule,
     MatButtonModule,
+    MatTooltipModule,
     NavComponent,
   ],
   template: `
@@ -46,6 +49,13 @@ import { NavComponent } from '../nav/nav.component';
             <mat-icon>menu</mat-icon>
           </button>
           <span class="toolbar-app-name">SvirERP</span>
+          <span class="toolbar-spacer"></span>
+          @if (auth.currentUser(); as user) {
+            <span class="toolbar-user">{{ user.name || user.email }}</span>
+          }
+          <button mat-icon-button (click)="logout()" aria-label="Log out" matTooltip="Log out">
+            <mat-icon>logout</mat-icon>
+          </button>
         </mat-toolbar>
 
         <main class="shell-main">
@@ -69,14 +79,22 @@ import { NavComponent } from '../nav/nav.component';
     .brand-name { font-size: 20px; font-weight: 500; }
     .shell-toolbar { position: sticky; top: 0; z-index: 10; }
     .toolbar-app-name { margin-left: 8px; font-size: 18px; }
+    .toolbar-spacer { flex: 1 1 auto; }
+    .toolbar-user { margin-right: 8px; font-size: 14px; opacity: .85; }
     .shell-main { padding: 0; min-height: calc(100vh - 64px); }
   `],
 })
 export class ShellComponent {
   private breakpoint = inject(BreakpointObserver);
+  private router = inject(Router);
+  protected auth = inject(AuthService);
 
   isMobile = toSignal(
     this.breakpoint.observe(Breakpoints.Handset).pipe(map(r => r.matches)),
     { initialValue: false },
   );
+
+  logout(): void {
+    this.auth.logout().subscribe(() => this.router.navigateByUrl('/login'));
+  }
 }
