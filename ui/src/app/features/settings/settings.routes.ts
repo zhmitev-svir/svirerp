@@ -37,6 +37,13 @@ export const settingsRoutes: Routes = [
             m => m.CalendarSettingsComponent,
           ),
       },
+      {
+        path: 'email',
+        loadComponent: () =>
+          import('./pages/email-settings/email-settings.component').then(
+            m => m.EmailSettingsComponent,
+          ),
+      },
     ],
   },
 ];

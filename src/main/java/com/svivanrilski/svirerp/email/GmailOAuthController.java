@@ -4,6 +4,7 @@ import com.svivanrilski.svirerp.settings.AppSettingService;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
@@ -26,12 +27,14 @@ import java.util.Map;
 @RestController
 @RequestMapping("/api/settings/gmail")
 @RequiredArgsConstructor
+@Slf4j
 public class GmailOAuthController {
 
     private static final String AUTHORIZATION_URI = "https://accounts.google.com/o/oauth2/v2/auth";
     private static final String TOKEN_URI = "https://oauth2.googleapis.com/token";
     private static final String USERINFO_URI = "https://www.googleapis.com/oauth2/v3/userinfo";
-    private static final String SCOPE = "https://www.googleapis.com/auth/gmail.send";
+    private static final String SCOPE =
+            "https://www.googleapis.com/auth/gmail.send https://www.googleapis.com/auth/userinfo.email";
 
     private final AppSettingService settingService;
     private final EmailService emailService;
@@ -104,6 +107,7 @@ public class GmailOAuthController {
 
             response.sendRedirect("/settings/gmail?gmail_connected=true");
         } catch (Exception e) {
+            log.error("Gmail OAuth callback failed", e);
             response.sendRedirect("/settings/gmail?gmail_error=connect_failed");
         }
     }

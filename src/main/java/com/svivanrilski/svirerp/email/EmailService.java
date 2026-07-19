@@ -32,10 +32,20 @@ public class EmailService {
     private final RestClient restClient = RestClient.create();
 
     public void send(String to, String subject, String htmlBody) {
+        String mode = settingService.getDecryptedValue("email.mode").orElse("DISABLED");
+        String resolvedTo = switch (mode) {
+            case "DISABLED" -> throw new IllegalArgumentException(
+                    "Email sending is disabled — enable it in Settings → Email");
+            case "TEST" -> settingService.getDecryptedValue("email.test-address")
+                    .filter(address -> !address.isBlank())
+                    .orElseThrow(() -> new IllegalArgumentException("Email test address is not configured"));
+            default -> to;
+        };
+
         String senderAddress = settingService.getDecryptedValue("gmail.sender-address")
                 .orElseThrow(() -> new IllegalArgumentException("Gmail account is not connected yet — use Connect Gmail in Settings"));
 
-        String raw = buildRawMessage(senderAddress, to, subject, htmlBody);
+        String raw = buildRawMessage(senderAddress, resolvedTo, subject, htmlBody);
         String accessToken = tokenService.getAccessToken();
 
         restClient.post()

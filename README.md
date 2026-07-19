@@ -54,7 +54,7 @@ svirerp/
 │       └── resources/
 │           ├── application.properties              # Base config (env-var placeholders)
 │           ├── application-local.properties.example  # Copy & fill for local dev
-│           └── db/migration/                       # Flyway V1–V38 SQL scripts
+│           └── db/migration/                       # Flyway V1–V39 SQL scripts
 ├── ui/                          # Angular 21 front-end (see Angular UI section)
 ├── mvnw                         # Unix Maven Wrapper
 ├── mvnw.cmd                     # Windows Maven Wrapper
@@ -192,7 +192,7 @@ Failed attempts are rate-limited (5 failures per IP within 15 minutes triggers a
 
 ## Admin Settings
 
-An admin-only Settings area (`/settings` in the UI, gated by `ROLE_ADMIN` — only the [local admin login](#local-admin-login-break-glass-fallback) has this role, so Google-authenticated users never see it) covers two things:
+An admin-only Settings area (`/settings` in the UI, gated by `ROLE_ADMIN` — only the [local admin login](#local-admin-login-break-glass-fallback) has this role, so Google-authenticated users never see it) covers the following:
 
 ### General settings
 
@@ -211,16 +211,26 @@ The Gmail tab under Settings (`/settings/gmail`, migration V31) lets an admin co
 
 **One-time Google Cloud Console setup** (separate OAuth Client from the one used for [Google sign-in](#authentication)):
 
-1. Create an OAuth 2.0 Client ID (Web application type) with authorized redirect URI `{origin}/api/settings/gmail/callback` (e.g. `http://localhost:8080/api/settings/gmail/callback` for local dev) and the `gmail.send` scope.
+1. Create an OAuth 2.0 Client ID (Web application type) with authorized redirect URI `{origin}/api/settings/gmail/callback` (e.g. `http://localhost:8080/api/settings/gmail/callback` for local dev) and both the `gmail.send` and `userinfo.email` scopes — the latter is required because the callback also calls Google's userinfo endpoint to record the connected account's address (`gmail.sender-address`); a token minted with `gmail.send` alone gets a 401 from that call.
 2. On the admin Settings → Gmail page, paste the client ID and secret and save.
 3. Click **Connect Gmail** — this starts the OAuth consent flow (`GET /api/settings/gmail/authorize-url`) and, on approval, the callback (`GET /api/settings/gmail/callback`) exchanges the auth code for a refresh token and stores it (encrypted) along with the connected account's address (`gmail.sender-address`) in `app_setting`.
-4. Use **Send Test Email** on the same page to confirm the connection works end-to-end.
+4. Use **Send Test Email** on the same page to confirm the connection works end-to-end (subject to the [Email switch](#email-central-onofftest-switch) below — it's `DISABLED` by default, so connect that first if the test send is unexpectedly blocked).
 
 Access tokens are minted on demand from the stored refresh token (`GmailTokenService`, cached in memory until near expiry) — rotating the client secret or reconnecting the account takes effect immediately, no restart needed, same pattern as Google sign-in's client credentials.
 
 - `GET /api/settings/gmail/authorize-url` — builds the Google consent URL (`ROLE_ADMIN`)
 - `GET /api/settings/gmail/callback` — OAuth2 redirect target; not called directly
 - `POST /api/settings/gmail/test-send` — `{ "to": "..." }`, sends a canned test email (`ROLE_ADMIN`)
+
+### Email (central on/off/test switch)
+
+The Email tab under Settings (`/settings/email`, migration V39) is a single gate every outgoing email passes through, checked inside `EmailService.send()` itself rather than at each call site — so any future feature that sends email inherits it automatically, with no per-feature wiring. Backed by two `app_setting` rows: `email.mode` (`DISABLED` / `LIVE` / `TEST`) and `email.test-address`.
+
+- **Disabled** (the default on a fresh deploy) — blocks every send, including the Gmail tab's own Send Test Email button. Fails with a clear 400 rather than silently dropping the email.
+- **Live** — sends normally to the real recipient.
+- **Test** — every email is redirected to the configured `email.test-address` instead of its real recipient, content unchanged (no "would have gone to" annotation) — lets you verify email content/formatting before real people receive anything.
+
+No dedicated endpoints — both settings are read/written through the existing generic `GET /api/settings` / `PUT /api/settings/{key}`, same as any other setting; the Email tab is just a purpose-built radio-group UI over those two keys (the generic Settings → General page deliberately excludes `email.*` keys, same as it already does for `gmail.*`/`calendar.*`).
 
 ---
 
@@ -310,7 +320,7 @@ The Flyway Maven plugin lets you apply or inspect migrations without starting th
 
 ### Adding a new migration
 
-1. Create `src/main/resources/db/migration/V39__your_description.sql` (check `db/migration/` for the current highest version first — don't assume it matches this doc)
+1. Create `src/main/resources/db/migration/V40__your_description.sql` (check `db/migration/` for the current highest version first — don't assume it matches this doc)
 2. Write your `ALTER TABLE` / `CREATE TABLE` / etc.
 3. Update the corresponding JPA entity
 4. Restart the app (or run `./mvnw flyway:migrate`) — Flyway applies it automatically
@@ -468,3 +478,4 @@ Pagination is available on all list endpoints via `?page=0&size=20&sort=field,as
 | V36 | `vendor` (org-scoped payee list for expenses) |
 | V37 | `service_request` (pre-paid church services — weddings, baptisms, funerals, memorials — tracked independently of scheduling, optional FK to `church_event`) |
 | V38 | `journal_entry` transaction tags: `payment_method`, `check_number`, and nullable FKs `payer_id`→`person`, `vendor_id`→`vendor`, `service_request_id`→`service_request`, `category_account_id`/`fund_id`→`account`/`fund` — denormalized so the Finance transaction list doesn't need to join `journal_line` |
+| V39 | `app_setting` rows for the central email switch (`email.mode` defaulting to `DISABLED`, `email.test-address`) — no new table, reuses V28's `app_setting` |
