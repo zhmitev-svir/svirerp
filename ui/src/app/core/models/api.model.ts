@@ -50,3 +50,39 @@ export interface AppSetting {
   description?: string;
   hasValue: boolean;
 }
+
+/** Response shape of GET /api/zeffy-imports/{batchId}/summary — a synthesized preview
+ * projection, not a persisted entity. */
+export interface ZeffyImportSummary {
+  batchId: string;
+  totalRows: number;
+  readyCount: number;
+  duplicateCount: number;
+  skippedStatusCount: number;
+  unmappedCampaignCount: number;
+  errorCount: number;
+  committedCount: number;
+  newPersonCount: number;
+  newMemberCount: number;
+  totalAmountReady: number;
+  unmappedCampaignTitles: string[];
+}
+
+/** Response shape of POST /api/organizations/{orgId}/zeffy-imports/{batchId}/commit. */
+export interface ZeffyImportCommitResult {
+  batchId: string;
+  committed: number;
+  failed: number;
+  stillUnmappedCampaign: number;
+}
+
+/** Request body for POST /api/organizations/{orgId}/zeffy-campaign-mappings/bulk. */
+export interface ZeffyCampaignMappingRequest {
+  campaignTitle: string;
+  fundId: string;
+}
+
+/** Response shape of POST /api/organizations/{orgId}/members/recompute-tiers. */
+export interface RecomputeTiersResult {
+  membersProcessed: number;
+}

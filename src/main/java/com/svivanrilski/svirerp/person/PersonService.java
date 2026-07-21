@@ -44,6 +44,23 @@ public class PersonService {
         return repo.save(person);
     }
 
+    /**
+     * Fills in only currently-null fields on an existing Person from {@code source} — never
+     * overwrites data already on file. Used by find-or-create import flows (e.g. Zeffy) where the
+     * imported row shouldn't clobber contact info a person may have updated through other means.
+     */
+    @Transactional
+    public Person fillBlankFields(UUID id, Person source) {
+        Person existing = findById(id);
+        if (existing.getPhone() == null) existing.setPhone(source.getPhone());
+        if (existing.getAddressLine1() == null) existing.setAddressLine1(source.getAddressLine1());
+        if (existing.getCity() == null) existing.setCity(source.getCity());
+        if (existing.getState() == null) existing.setState(source.getState());
+        if (existing.getZip() == null) existing.setZip(source.getZip());
+        if (existing.getDateOfBirth() == null) existing.setDateOfBirth(source.getDateOfBirth());
+        return repo.save(existing);
+    }
+
     @Transactional
     public Person update(UUID id, Person patch) {
         Person existing = findById(id);

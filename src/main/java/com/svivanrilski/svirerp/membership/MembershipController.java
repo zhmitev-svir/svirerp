@@ -56,8 +56,10 @@ public class MembershipController {
 
     @GetMapping("/api/organizations/{orgId}/members")
     public Page<Member> listMembers(@PathVariable UUID orgId,
-            @RequestParam(required = false) String status, Pageable pageable) {
-        return service.findAllMembers(orgId, status, pageable);
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) UUID membershipTypeId,
+            Pageable pageable) {
+        return service.findAllMembers(orgId, status, membershipTypeId, pageable);
     }
 
     @GetMapping("/api/organizations/{orgId}/members/import-template")
@@ -86,6 +88,17 @@ public class MembershipController {
     @GetMapping("/api/members/expired")
     public List<Member> expiredMembers() {
         return service.findExpiredMembers();
+    }
+
+    /** Manual re-run of tier computation for every member in the org — tier can go stale purely
+     *  from time passing (a qualifying payment ages past its 1-year window with no new payment
+     *  event), so this doesn't require a new Zeffy import to catch up. */
+    @PostMapping("/api/organizations/{orgId}/members/recompute-tiers")
+    public RecomputeTiersResult recomputeTiers(@PathVariable UUID orgId) {
+        return new RecomputeTiersResult(service.recomputeAllTiersForOrg(orgId));
+    }
+
+    public record RecomputeTiersResult(int membersProcessed) {
     }
 
     @PostMapping("/api/members")

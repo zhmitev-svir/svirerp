@@ -27,4 +27,6 @@ public interface MembershipTypeRepository extends JpaRepository<MembershipType, 
     /** Resolves the human-readable name used in the member import template to an actual type. */
     @EntityGraph(attributePaths = "org")
     Optional<MembershipType> findByOrgIdAndNameIgnoreCase(UUID orgId, String name);
+
+    boolean existsByOrgIdAndNameIgnoreCase(UUID orgId, String name);
 }

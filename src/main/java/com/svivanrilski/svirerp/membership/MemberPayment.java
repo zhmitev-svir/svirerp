@@ -2,7 +2,7 @@ package com.svivanrilski.svirerp.membership;
 
 import jakarta.persistence.*;
 import jakarta.validation.constraints.NotNull;
-import jakarta.validation.constraints.Positive;
+import jakarta.validation.constraints.PositiveOrZero;
 import lombok.*;
 
 import java.math.BigDecimal;
@@ -29,8 +29,10 @@ public class MemberPayment {
     @JoinColumn(name = "member_id", nullable = false)
     private Member member;
 
+    // PositiveOrZero (not Positive): Zeffy allows $0 payments (e.g. free-RSVP donations), and a
+    // $0 payment is meaningful for membership tier computation — see TierCalculator.
     @NotNull
-    @Positive
+    @PositiveOrZero
     @Column(nullable = false, precision = 10, scale = 2)
     private BigDecimal amount;
 

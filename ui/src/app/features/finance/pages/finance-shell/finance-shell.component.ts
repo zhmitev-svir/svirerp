@@ -29,6 +29,10 @@ import { MatTabsModule } from '@angular/material/tabs';
          [active]="serviceRequestsActive.isActive">
         Service Requests
       </a>
+      <a mat-tab-link routerLink="zeffy-import" routerLinkActive #zeffyImportActive="routerLinkActive"
+         [active]="zeffyImportActive.isActive">
+        Zeffy Import
+      </a>
     </nav>
     <mat-tab-nav-panel #tabPanel>
       <router-outlet />

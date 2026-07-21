@@ -177,6 +177,13 @@ public class FinanceService {
                 .orElseThrow(() -> new ResourceNotFoundException("Account", id));
     }
 
+    /** Looks up one of the lazily-seeded default accounts (e.g. "4010", "1010") by number. */
+    public Account findAccountByNumber(UUID orgId, String accountNumber) {
+        return accountRepo.findByOrgIdAndAccountNumber(orgId, accountNumber)
+                .orElseThrow(() -> new ResourceNotFoundException(
+                        "Account " + accountNumber + " not found for org " + orgId));
+    }
+
     @Transactional
     public Account createAccount(Account account) {
         validate(ACCOUNT_TYPES, account.getAccountType(), "account type");

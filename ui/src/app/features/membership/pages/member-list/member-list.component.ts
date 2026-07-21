@@ -9,9 +9,10 @@ import { MatSelectModule } from '@angular/material/select';
 import { FormsModule } from '@angular/forms';
 
 import { MemberService } from '../../services/member.service';
+import { MembershipTypeService } from '../../services/membership-type.service';
 import { OrgContextService } from '../../../../core/services/org-context.service';
 import { NotificationService } from '../../../../core/services/notification.service';
-import { Member } from '../../../../core/models/domain.model';
+import { Member, MembershipType } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
 import { DataTableComponent, TableColumn, TableAction } from '../../../../shared/components/data-table/data-table.component';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
@@ -41,6 +42,10 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
             <mat-icon>upload</mat-icon>
             Import Members
           </button>
+          <button mat-stroked-button [disabled]="recomputingTiers()" (click)="recomputeTiers()">
+            <mat-icon>refresh</mat-icon>
+            Recompute Tiers
+          </button>
         </ng-container>
       </app-page-header>
 
@@ -51,6 +56,16 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
             <mat-option [value]="null">All</mat-option>
             @for (s of statuses; track s) {
               <mat-option [value]="s">{{ s }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Membership Type</mat-label>
+          <mat-select [(ngModel)]="membershipTypeFilter" (selectionChange)="onFilterChange()">
+            <mat-option [value]="null">All</mat-option>
+            @for (t of membershipTypes(); track t.id) {
+              <mat-option [value]="t.id">{{ t.name }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
@@ -72,6 +87,7 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
 })
 export class MemberListComponent implements OnInit {
   private memberService = inject(MemberService);
+  private membershipTypeService = inject(MembershipTypeService);
   private orgContext = inject(OrgContextService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
@@ -81,9 +97,12 @@ export class MemberListComponent implements OnInit {
   page = signal<Page<Member> | null>(null);
   loading = signal(false);
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
+  recomputingTiers = signal(false);
+  membershipTypes = signal<MembershipType[]>([]);
 
   readonly statuses = ['active', 'inactive', 'suspended', 'expired', 'pending'];
   statusFilter: string | null = null;
+  membershipTypeFilter: string | null = null;
 
   readonly columns: TableColumn[] = [
     { key: 'person', header: 'Name', cell: m => `${m.person.firstName} ${m.person.lastName}` },
@@ -102,6 +121,11 @@ export class MemberListComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadPage();
+    this.orgContext.ensureOrgId().subscribe(orgId => {
+      this.membershipTypeService.getPageForOrg(orgId, { page: 0, size: 100 }).subscribe(page => {
+        this.membershipTypes.set(page.content);
+      });
+    });
   }
 
   onPageChange(event: PageEvent): void {
@@ -160,6 +184,25 @@ export class MemberListComponent implements OnInit {
       .subscribe(imported => { if (imported) this.loadPage(); });
   }
 
+  recomputeTiers(): void {
+    if (!this.orgId) {
+      this.notifications.error('No organization found — create one first, under Organizations.');
+      return;
+    }
+    this.recomputingTiers.set(true);
+    this.memberService.recomputeTiers(this.orgId).subscribe({
+      next: result => {
+        this.recomputingTiers.set(false);
+        this.notifications.success(`Recomputed tiers for ${result.membersProcessed} member(s).`);
+        this.loadPage();
+      },
+      error: () => {
+        this.recomputingTiers.set(false);
+        this.notifications.error('Could not recompute tiers.');
+      },
+    });
+  }
+
   confirmDelete(member: Member): void {
     this.dialog
       .open(ConfirmDialogComponent, {
@@ -178,7 +221,7 @@ export class MemberListComponent implements OnInit {
     this.orgContext.ensureOrgId().subscribe({
       next: orgId => {
         this.orgId = orgId;
-        this.memberService.getPageForOrg(orgId, this.pageParams(), this.statusFilter).subscribe({
+        this.memberService.getPageForOrg(orgId, this.pageParams(), this.statusFilter, this.membershipTypeFilter).subscribe({
           next: data => { this.page.set(data); this.loading.set(false); },
           error: () => this.loading.set(false),
         });

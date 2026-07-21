@@ -30,4 +30,7 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
     List<Account> findByOrgIdAndParentAccountIsNull(UUID orgId);
 
     boolean existsByOrgIdAndAccountNumber(UUID orgId, String accountNumber);
+
+    @EntityGraph(attributePaths = {"org", "parentAccount"})
+    Optional<Account> findByOrgIdAndAccountNumber(UUID orgId, String accountNumber);
 }

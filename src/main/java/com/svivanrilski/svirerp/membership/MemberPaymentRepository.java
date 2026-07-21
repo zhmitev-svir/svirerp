@@ -7,6 +7,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDate;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -32,4 +33,7 @@ public interface MemberPaymentRepository extends JpaRepository<MemberPayment, UU
 
     @EntityGraph(attributePaths = {"member", "member.person", "member.org", "member.membershipType"})
     Page<MemberPayment> findByMemberOrgIdAndPaymentDateGreaterThanEqual(UUID orgId, LocalDate fromDate, Pageable pageable);
+
+    /** Internal use only (tier computation reads amount/paymentDate directly) — never serialized, no EntityGraph needed. */
+    List<MemberPayment> findByMemberIdAndStatus(UUID memberId, String status);
 }

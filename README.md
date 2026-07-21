@@ -49,12 +49,13 @@ svirerp/
 │       │   ├── event/
 │       │   ├── volunteer/
 │       │   ├── finance/
+│       │   ├── zeffyimport/    # Zeffy payment import (.xlsx/.csv) — spans membership + finance
 │       │   ├── settings/       # Admin-only app_setting key/value store (Google OAuth creds, etc.)
 │       │   └── email/          # Gmail API email sending + Connect Gmail OAuth flow
 │       └── resources/
 │           ├── application.properties              # Base config (env-var placeholders)
 │           ├── application-local.properties.example  # Copy & fill for local dev
-│           └── db/migration/                       # Flyway V1–V39 SQL scripts
+│           └── db/migration/                       # Flyway V1–V41 SQL scripts
 ├── ui/                          # Angular 21 front-end (see Angular UI section)
 ├── mvnw                         # Unix Maven Wrapper
 ├── mvnw.cmd                     # Windows Maven Wrapper
@@ -406,7 +407,7 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | Persons | `GET/POST /api/persons` | `GET /api/persons/{id}`, `PUT`, `DELETE` |
 | Organizations | `GET/POST /api/organizations` | Single-org-per-installation in practice; managed via the [Admin Settings](#admin-settings) Organization tab |
 | Membership types | `GET /api/organizations/{id}/membership-types` | `POST/PUT /api/membership-types[/{id}]`, `DELETE /api/membership-types/{id}` |
-| Members | `GET /api/organizations/{id}/members` | `POST/PUT /api/members[/{id}]`, `DELETE`, `GET .../expired` |
+| Members | `GET /api/organizations/{id}/members` | `?status=&membershipTypeId=` filters (combinable); `POST/PUT /api/members[/{id}]`, `DELETE`, `GET .../expired` |
 | Member CSV import | `GET /api/organizations/{id}/members/import-template` | `POST .../members/import` (multipart CSV, best-effort per-row) |
 | Member contributions | `GET /api/organizations/{id}/member-payments` | `?fromDate=` filter; `POST/PUT /api/member-payments[/{id}]`, `DELETE`; per-member history at `GET /api/members/{memberId}/payments` |
 | Trustees | `GET /api/organizations/{id}/trustees` | `POST/PUT /api/trustees[/{id}]`, `DELETE`, `POST .../{id}/renew` (re-elects for a fresh 2-year term) |
@@ -431,6 +432,9 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | App settings (admin) | `GET /api/settings` | `PUT /api/settings/{key}`; `ROLE_ADMIN` only, `SECRET` values never returned |
 | Gmail (admin) | `GET /api/settings/gmail/authorize-url` | `GET .../callback` (OAuth redirect target), `POST .../test-send`; `ROLE_ADMIN` only — see [Admin Settings](#admin-settings) |
 | Google Calendar (admin) | `GET /api/settings/calendar/authorize-url` | `GET .../callback`, `POST .../test-connection`; `ROLE_ADMIN` only. One-way push only (ERP → Calendar, never the reverse) — see `CalendarEvent.publishToOfficial`/`publishToInternal` and their `google*SyncError` fields |
+| Zeffy payment import | `POST /api/organizations/{id}/zeffy-imports/preview` | Multipart `.xlsx`/`.xls`/`.csv` — Zeffy's real export is an Excel spreadsheet, parsed via Apache POI (`.csv` also accepted); persists one row per line with a computed `outcome` (`ready`/`duplicate`/`skipped_status`/`unmapped_campaign`/`error`), no writes to `Person`/`Member`/`MemberPayment`/`JournalEntry` yet. `GET .../zeffy-imports`, `GET /api/zeffy-imports/{batchId}[/summary\|/rows]`, `POST /api/organizations/{id}/zeffy-imports/{batchId}/commit` — applies every still-eligible row, one DB transaction per row (`ZeffyImportRowApplier`) |
+| Zeffy campaign mappings | `GET /api/organizations/{id}/zeffy-campaign-mappings` | `POST .../zeffy-campaign-mappings/bulk`, `DELETE /api/zeffy-campaign-mappings/{id}` — persists which `Fund` a Zeffy "Campaign Title" posts income to, so recurring campaigns don't need remapping every import |
+| Recompute member tiers | `POST /api/organizations/{id}/members/recompute-tiers` | Re-runs Follower/Member/Benefactor tier computation for every member in the org — tier can go stale purely from elapsed time, not just new payments |
 
 Pagination is available on all list endpoints via `?page=0&size=20&sort=field,asc`.
 
@@ -479,3 +483,5 @@ Pagination is available on all list endpoints via `?page=0&size=20&sort=field,as
 | V37 | `service_request` (pre-paid church services — weddings, baptisms, funerals, memorials — tracked independently of scheduling, optional FK to `church_event`) |
 | V38 | `journal_entry` transaction tags: `payment_method`, `check_number`, and nullable FKs `payer_id`→`person`, `vendor_id`→`vendor`, `service_request_id`→`service_request`, `category_account_id`/`fund_id`→`account`/`fund` — denormalized so the Finance transaction list doesn't need to join `journal_line` |
 | V39 | `app_setting` rows for the central email switch (`email.mode` defaulting to `DISABLED`, `email.test-address`) — no new table, reuses V28's `app_setting` |
+| V40 | Widens `member_payment.payment_method`'s CHECK to accept `'zeffy'` (via `MODIFY COLUMN` — MariaDB 11.8 embeds this CHECK in the column definition itself, not as a droppable named table constraint) |
+| V41 | `zeffy_campaign_mapping` (org-scoped Campaign Title → `fund` mapping), `zeffy_import_batch`, `zeffy_import_row` (preview/commit staging area and permanent audit trail for the Zeffy payment import, one row per spreadsheet line with a computed `outcome`) |

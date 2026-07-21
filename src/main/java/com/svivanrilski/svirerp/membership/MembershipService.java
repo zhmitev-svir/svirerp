@@ -11,6 +11,7 @@ import com.svivanrilski.svirerp.organization.OrganizationService;
 import com.svivanrilski.svirerp.person.Person;
 import com.svivanrilski.svirerp.person.PersonService;
 
+import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
@@ -26,7 +27,7 @@ public class MembershipService {
     private static final Set<String> MEMBER_STATUSES =
             Set.of("active", "inactive", "suspended", "expired", "pending");
     private static final Set<String> PAYMENT_METHODS =
-            Set.of("cash", "check", "credit_card", "ach", "online", "other");
+            Set.of("cash", "check", "credit_card", "ach", "online", "other", "zeffy");
     private static final Set<String> PAYMENT_STATUSES =
             Set.of("pending", "completed", "failed", "refunded");
 
@@ -77,12 +78,21 @@ public class MembershipService {
 
     // ── Member ───────────────────────────────────────────────────────────────
 
-    public Page<Member> findAllMembers(UUID orgId, String status, Pageable pageable) {
-        if (status == null || status.isBlank()) {
-            return memberRepo.findByOrgId(orgId, pageable);
+    public Page<Member> findAllMembers(UUID orgId, String status, UUID membershipTypeId, Pageable pageable) {
+        if (status != null && !status.isBlank()) {
+            validateMemberStatus(status);
         }
-        validateMemberStatus(status);
-        return memberRepo.findByOrgIdAndStatus(orgId, status, pageable);
+        boolean hasStatus = status != null && !status.isBlank();
+        if (hasStatus && membershipTypeId != null) {
+            return memberRepo.findByOrgIdAndStatusAndMembershipTypeId(orgId, status, membershipTypeId, pageable);
+        }
+        if (hasStatus) {
+            return memberRepo.findByOrgIdAndStatus(orgId, status, pageable);
+        }
+        if (membershipTypeId != null) {
+            return memberRepo.findByOrgIdAndMembershipTypeId(orgId, membershipTypeId, pageable);
+        }
+        return memberRepo.findByOrgId(orgId, pageable);
     }
 
     public Member findMemberById(UUID id) {
@@ -236,6 +246,108 @@ public class MembershipService {
     public void deletePayment(UUID id) {
         if (!paymentRepo.existsById(id)) throw new ResourceNotFoundException("MemberPayment", id);
         paymentRepo.deleteById(id);
+    }
+
+    // ── Zeffy tier computation ──────────────────────────────────────────────
+    // See TierCalculator for the algorithm. MembershipType names below are the ones
+    // ZeffyImportService/recomputeTier resolve a computed tier name against.
+
+    private static final String[] ZEFFY_TIER_TYPES = {
+        // name, canVote
+        TierCalculator.FOLLOWER, TierCalculator.MEMBER, TierCalculator.BENEFACTOR,
+    };
+
+    /**
+     * Lazily seeds the three Zeffy tier MembershipTypes for an org. Deliberately not gated on
+     * "type list is empty" (unlike the Finance chart-of-accounts seed) — an org may already have
+     * unrelated custom types (e.g. from the pre-existing member CSV import), so that guard would
+     * silently skip seeding these. Idempotent per-row instead.
+     */
+    @Transactional
+    public void ensureZeffyTierTypesSeeded(UUID orgId) {
+        Organization org = orgService.findById(orgId);
+        for (String name : ZEFFY_TIER_TYPES) {
+            if (!typeRepo.existsByOrgIdAndNameIgnoreCase(orgId, name)) {
+                typeRepo.save(MembershipType.builder()
+                        .org(org)
+                        .name(name)
+                        .canVote(!TierCalculator.FOLLOWER.equals(name))
+                        .annualFee(BigDecimal.ZERO)
+                        .durationMonths(12)
+                        .isActive(true)
+                        .build());
+            }
+        }
+    }
+
+    /**
+     * Recomputes a member's tier (MembershipType) and status from their full completed-payment
+     * history. Status is "active" whenever any tier applies — which is always, once any completed
+     * payment exists, since Follower never expires. "inactive" is reserved for a Member with zero
+     * completed-payment history at all; unreachable via Zeffy import (a Member is only created
+     * because a payment triggered it) but possible for a manually-created Member with no payments.
+     * expiryDate reflects the member's last-ever $150+ payment plus one year — see
+     * TierCalculator's class doc — so it stays populated (often in the past) even after a member's
+     * current tier has lapsed back to Follower; it does not drive status. Null only for a member
+     * who was never a $150+ payer at all.
+     */
+    @Transactional
+    public Member recomputeTier(UUID memberId) {
+        Member member = findMemberById(memberId);
+        ensureZeffyTierTypesSeeded(member.getOrg().getId());
+
+        List<TierCalculator.PaymentSnapshot> snapshots = paymentRepo
+                .findByMemberIdAndStatus(memberId, "completed").stream()
+                .map(p -> new TierCalculator.PaymentSnapshot(p.getAmount(), p.getPaymentDate()))
+                .toList();
+        TierCalculator.TierResult result = TierCalculator.compute(snapshots);
+
+        if (result == null) {
+            member.setStatus("inactive");
+            return memberRepo.save(member);
+        }
+
+        MembershipType tierType = typeRepo.findByOrgIdAndNameIgnoreCase(member.getOrg().getId(), result.tierName())
+                .orElseThrow(() -> new IllegalStateException("Zeffy tier type not seeded: " + result.tierName()));
+        member.setMembershipType(tierType);
+        member.setStatus("active");
+        member.setExpiryDate(result.expiryDate());
+        return memberRepo.save(member);
+    }
+
+    public boolean hasMembership(UUID personId, UUID orgId) {
+        return memberRepo.existsByPersonIdAndOrgId(personId, orgId);
+    }
+
+    /** Find-or-create a Member starting at the Follower tier — used by ZeffyImportRowApplier for a
+     *  brand-new payer. Kept here (rather than reaching into MemberRepository from another package)
+     *  so all Member/MembershipType access stays inside this domain's service, per this repo's
+     *  one-shared-service-per-domain-area convention. */
+    @Transactional
+    public Member findOrCreateFollowerMember(UUID personId, UUID orgId, LocalDate joinDate) {
+        return memberRepo.findByPersonIdAndOrgId(personId, orgId).orElseGet(() -> {
+            ensureZeffyTierTypesSeeded(orgId);
+            MembershipType follower = typeRepo.findByOrgIdAndNameIgnoreCase(orgId, TierCalculator.FOLLOWER)
+                    .orElseThrow(() -> new IllegalStateException("Zeffy tier type not seeded: " + TierCalculator.FOLLOWER));
+            return memberRepo.save(Member.builder()
+                    .person(personService.findById(personId))
+                    .org(orgService.findById(orgId))
+                    .membershipType(follower)
+                    .joinDate(joinDate)
+                    .status("active")
+                    .emailOptIn(true)
+                    .build());
+        });
+    }
+
+    /** Backs the manual "Recompute Tiers" action — tier can go stale purely from time passing. */
+    @Transactional
+    public int recomputeAllTiersForOrg(UUID orgId) {
+        List<Member> members = memberRepo.findByOrgId(orgId, Pageable.unpaged()).getContent();
+        for (Member member : members) {
+            recomputeTier(member.getId());
+        }
+        return members.size();
     }
 
     // ── Helpers ──────────────────────────────────────────────────────────────

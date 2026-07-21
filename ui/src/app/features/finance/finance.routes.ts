@@ -36,6 +36,20 @@ export const financeRoutes: Routes = [
             m => m.ServiceRequestListComponent,
           ),
       },
+      {
+        path: 'zeffy-import',
+        loadComponent: () =>
+          import('./pages/zeffy-import-list/zeffy-import-list.component').then(
+            m => m.ZeffyImportListComponent,
+          ),
+      },
     ],
+  },
+  {
+    path: 'zeffy-import/:batchId',
+    loadComponent: () =>
+      import('./pages/zeffy-import-detail/zeffy-import-detail.component').then(
+        m => m.ZeffyImportDetailComponent,
+      ),
   },
 ];

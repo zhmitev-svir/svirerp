@@ -27,6 +27,13 @@ public interface MemberRepository extends JpaRepository<Member, UUID> {
     @EntityGraph(attributePaths = {"person", "org", "membershipType"})
     Page<Member> findByOrgIdAndStatus(UUID orgId, String status, Pageable pageable);
 
+    @EntityGraph(attributePaths = {"person", "org", "membershipType"})
+    Page<Member> findByOrgIdAndMembershipTypeId(UUID orgId, UUID membershipTypeId, Pageable pageable);
+
+    @EntityGraph(attributePaths = {"person", "org", "membershipType"})
+    Page<Member> findByOrgIdAndStatusAndMembershipTypeId(
+            UUID orgId, String status, UUID membershipTypeId, Pageable pageable);
+
     List<Member> findByExpiryDateBefore(LocalDate date);
 
     boolean existsByPersonIdAndOrgIdAndStatus(UUID personId, UUID orgId, String status);

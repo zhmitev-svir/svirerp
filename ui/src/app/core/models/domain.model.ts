@@ -73,7 +73,7 @@ export interface MemberPayment {
   member: Member;
   amount: number;
   paymentDate: string;
-  paymentMethod?: 'cash' | 'check' | 'credit_card' | 'ach' | 'online' | 'other';
+  paymentMethod?: 'cash' | 'check' | 'credit_card' | 'ach' | 'online' | 'other' | 'zeffy';
   transactionRef?: string;
   periodStart?: string;
   periodEnd?: string;
@@ -434,4 +434,57 @@ export interface ReconciliationItem {
   isCleared: boolean;
   itemType: 'transaction' | 'deposit_in_transit' | 'outstanding_check' | 'adjustment';
   notes?: string;
+}
+
+// ─── Zeffy Import ────────────────────────────────────────────────────────────
+export interface ZeffyCampaignMapping {
+  id: string;
+  org: Organization;
+  campaignTitle: string;
+  fund: Fund;
+  createdAt?: string;
+}
+
+export interface ZeffyImportBatch {
+  id: string;
+  org: Organization;
+  fileName: string;
+  uploadedAt?: string;
+  status: 'previewed' | 'committed';
+  rowCount: number;
+  committedAt?: string;
+}
+
+/** One row per line of an uploaded Zeffy CSV — the preview/commit staging area and audit trail. */
+export interface ZeffyImportRow {
+  id: string;
+  batch: ZeffyImportBatch;
+  org: Organization;
+  rowNumber: number;
+  paymentDate?: string;
+  paymentTime?: string;
+  amount?: number;
+  paymentStatus?: string;
+  payoutDate?: string;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  address?: string;
+  city?: string;
+  postalCode?: string;
+  state?: string;
+  country?: string;
+  taxReceiptNumber?: string;
+  taxReceiptUrl?: string;
+  campaignTitle?: string;
+  dedupeKey?: string;
+  outcome: 'pending_preview' | 'ready' | 'duplicate' | 'skipped_status' | 'unmapped_campaign' | 'error' | 'committed';
+  outcomeDetail?: string;
+  isNewPerson: boolean;
+  isNewMember: boolean;
+  person?: Person;
+  member?: Member;
+  memberPayment?: MemberPayment;
+  journalEntry?: JournalEntry;
+  fund?: Fund;
 }
