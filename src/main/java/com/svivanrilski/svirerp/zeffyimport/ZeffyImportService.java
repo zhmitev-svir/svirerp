@@ -281,7 +281,11 @@ public class ZeffyImportService {
         row.setPaymentTime(raw.get(COL_PAYMENT_TIME));
         row.setAmount(parseAmount(raw.get(COL_AMOUNT)));
         row.setPaymentStatus(raw.get(COL_PAYMENT_STATUS));
-        row.setPayoutDate(parseDate(raw.get(COL_PAYOUT_DATE)));
+        // Payout Date is purely informational — stored for reference but never read by any
+        // membership/tier/finance logic, which uses Payment Date exclusively (see
+        // ZeffyImportRowApplier). Parsed leniently so a placeholder value Zeffy uses for a payout
+        // that hasn't happened yet (e.g. "Unknown") doesn't fail the whole row.
+        row.setPayoutDate(parseDateLenient(raw.get(COL_PAYOUT_DATE)));
         row.setFirstName(raw.get(COL_FIRST_NAME));
         row.setLastName(raw.get(COL_LAST_NAME));
         row.setEmail(raw.get(COL_EMAIL));
@@ -492,6 +496,16 @@ public class ZeffyImportService {
             }
         }
         throw new IllegalArgumentException("Unrecognized date format: " + raw);
+    }
+
+    /** Same as parseDate, but returns null instead of throwing — for columns whose value is
+     *  never actually used, so a garbage/placeholder value shouldn't fail the whole row. */
+    private LocalDate parseDateLenient(String raw) {
+        try {
+            return parseDate(raw);
+        } catch (IllegalArgumentException e) {
+            return null;
+        }
     }
 
     private String truncate(String detail) {
