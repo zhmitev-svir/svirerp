@@ -77,7 +77,8 @@ import { MemberImportDialogComponent } from '../member-import-dialog/member-impo
         [data]="page()"
         [loading]="loading()"
         [pageParams]="pageParams()"
-        (pageChange)="onPageChange($event)" />
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)" />
     </div>
   `,
   styles: [`
@@ -108,8 +109,8 @@ export class MemberListComponent implements OnInit {
     { key: 'person', header: 'Name', cell: m => `${m.person.firstName} ${m.person.lastName}` },
     { key: 'membershipType', header: 'Membership Type', cell: m => m.membershipType.name },
     { key: 'status', header: 'Status' },
-    { key: 'joinDate', header: 'Join Date' },
-    { key: 'expiryDate', header: 'Expiry Date' },
+    { key: 'joinDate', header: 'Join Date', sortable: true },
+    { key: 'expiryDate', header: 'Expiry Date', sortable: true },
     { key: 'memberNumber', header: 'Member #' },
   ];
 
@@ -129,12 +130,17 @@ export class MemberListComponent implements OnInit {
   }
 
   onPageChange(event: PageEvent): void {
-    this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.pageParams.set({ ...this.pageParams(), page: event.pageIndex, size: event.pageSize });
     this.loadPage();
   }
 
   onFilterChange(): void {
     this.pageParams.set({ ...this.pageParams(), page: 0 });
+    this.loadPage();
+  }
+
+  onSortChange(sort: string | null): void {
+    this.pageParams.set({ ...this.pageParams(), page: 0, sort: sort ?? undefined });
     this.loadPage();
   }
 

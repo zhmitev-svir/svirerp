@@ -54,7 +54,8 @@ import { MemberPaymentFormComponent } from '../member-payment-form/member-paymen
           [data]="payments()"
           [loading]="paymentsLoading()"
           [pageParams]="paymentPageParams()"
-          (pageChange)="onPaymentPageChange($event)" />
+          (pageChange)="onPaymentPageChange($event)"
+          (sortChange)="onPaymentSortChange($event)" />
       </div>
     }
   `,
@@ -80,7 +81,7 @@ export class MemberDetailComponent implements OnInit {
 
   readonly paymentColumns: TableColumn[] = [
     { key: 'amount', header: 'Amount', cell: (p: MemberPayment) => `$${Number(p.amount).toFixed(2)}` },
-    { key: 'paymentDate', header: 'Date' },
+    { key: 'paymentDate', header: 'Date', sortable: true },
     { key: 'notes', header: 'Notes', cell: (p: MemberPayment) => p.notes || '—' },
   ];
 
@@ -95,7 +96,12 @@ export class MemberDetailComponent implements OnInit {
   }
 
   onPaymentPageChange(event: PageEvent): void {
-    this.paymentPageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.paymentPageParams.set({ ...this.paymentPageParams(), page: event.pageIndex, size: event.pageSize });
+    this.loadPayments();
+  }
+
+  onPaymentSortChange(sort: string | null): void {
+    this.paymentPageParams.set({ ...this.paymentPageParams(), page: 0, sort: sort ?? undefined });
     this.loadPayments();
   }
 

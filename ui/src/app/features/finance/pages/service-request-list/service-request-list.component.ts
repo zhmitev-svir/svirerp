@@ -45,7 +45,8 @@ const SERVICE_TYPE_LABELS: Record<string, string> = {
         [loading]="loading()"
         [pageParams]="pageParams()"
         emptyMessage="No service requests yet."
-        (pageChange)="onPageChange($event)" />
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)" />
     </div>
   `,
 })
@@ -64,7 +65,7 @@ export class ServiceRequestListComponent implements OnInit {
   readonly columns: TableColumn[] = [
     { key: 'requestorPerson', header: 'Requested By', cell: r => r.requestorPerson ? `${r.requestorPerson.firstName} ${r.requestorPerson.lastName}` : '—' },
     { key: 'serviceType', header: 'Service', cell: r => SERVICE_TYPE_LABELS[r.serviceType] ?? r.serviceType },
-    { key: 'requestedDate', header: 'Date', cell: r => r.requestedDate || '—' },
+    { key: 'requestedDate', header: 'Date', cell: r => r.requestedDate || '—', sortable: true },
     { key: 'status', header: 'Status', cell: r => r.status },
     { key: 'agreedAmount', header: 'Agreed', cell: r => r.agreedAmount.toFixed(2) },
     { key: 'balance', header: 'Balance Due', cell: r => (this.balances()[r.id] ?? r.agreedAmount).toFixed(2) },
@@ -81,7 +82,12 @@ export class ServiceRequestListComponent implements OnInit {
   }
 
   onPageChange(event: PageEvent): void {
-    this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.pageParams.set({ ...this.pageParams(), page: event.pageIndex, size: event.pageSize });
+    this.loadPage();
+  }
+
+  onSortChange(sort: string | null): void {
+    this.pageParams.set({ ...this.pageParams(), page: 0, sort: sort ?? undefined });
     this.loadPage();
   }
 

@@ -2,6 +2,7 @@ import { Component, input, output, computed, ChangeDetectionStrategy } from '@an
 import { PageEvent } from '@angular/material/paginator';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule } from '@angular/material/paginator';
+import { MatSortModule, Sort, SortDirection } from '@angular/material/sort';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
@@ -18,6 +19,12 @@ export interface TableColumn {
   /** If set, the cell renders as a clickable link that calls this instead of plain text. */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   link?: (row: any) => void;
+  /** Makes the header clickable to sort — server-side, via the backend's Pageable/Sort, so the
+   *  whole dataset is sorted before paging, not just the current page. Clicking resets to page 1. */
+  sortable?: boolean;
+  /** Backend sort property, if it differs from `key` (e.g. a nested path like "person.email", or
+   *  because `key` is a computed/display-only column such as a joined name). Defaults to `key`. */
+  sortKey?: string;
 }
 
 export interface TableAction {
@@ -48,6 +55,7 @@ export interface TableAction {
   imports: [
     MatTableModule,
     MatPaginatorModule,
+    MatSortModule,
     MatProgressBarModule,
     MatIconModule,
     MatButtonModule,
@@ -59,11 +67,17 @@ export interface TableAction {
         <mat-progress-bar mode="indeterminate" class="loading-bar" />
       }
 
-      <mat-table [dataSource]="rows()" class="data-table mat-elevation-z1">
+      <mat-table [dataSource]="rows()" matSort matSortDisableClear
+                 [matSortActive]="activeSortKey()"
+                 [matSortDirection]="activeSortDirection()"
+                 (matSortChange)="onSortChange($event)"
+                 class="data-table mat-elevation-z1">
 
         @for (col of columns(); track col.key) {
           <ng-container [matColumnDef]="col.key">
-            <mat-header-cell *matHeaderCellDef>{{ col.header }}</mat-header-cell>
+            <mat-header-cell *matHeaderCellDef [mat-sort-header]="col.sortKey ?? col.key" [disabled]="!col.sortable">
+              {{ col.header }}
+            </mat-header-cell>
             <mat-cell *matCellDef="let row">
               @if (col.link) {
                 <a class="cell-link" (click)="col.link(row)">{{ col.cell ? col.cell(row) : (row[col.key] ?? '') }}</a>
@@ -128,6 +142,9 @@ export class DataTableComponent {
   pageParams = input<PageParams>(DEFAULT_PAGE_PARAMS);
 
   pageChange = output<PageEvent>();
+  /** Emits the new Spring-Data-style sort string ("field,asc"/"field,desc") to set on
+   *  PageParams.sort — the caller is expected to also reset page to 0 and reload. */
+  sortChange = output<string | null>();
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   rows = computed<any[]>(() => this.data()?.content ?? []);
@@ -135,4 +152,11 @@ export class DataTableComponent {
     ...this.columns().map(c => c.key),
     '_actions',
   ]);
+
+  activeSortKey = computed(() => this.pageParams().sort?.split(',')[0] ?? '');
+  activeSortDirection = computed<SortDirection>(() => (this.pageParams().sort?.split(',')[1] as SortDirection) ?? '');
+
+  onSortChange(sort: Sort): void {
+    this.sortChange.emit(sort.direction ? `${sort.active},${sort.direction}` : null);
+  }
 }

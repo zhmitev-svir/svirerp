@@ -49,7 +49,8 @@ import { PersonDetailsDialogComponent } from '../../../persons/pages/person-deta
         [data]="page()"
         [loading]="loading()"
         [pageParams]="pageParams()"
-        (pageChange)="onPageChange($event)" />
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)" />
     </div>
   `,
   styles: [`
@@ -81,7 +82,7 @@ export class VolunteerListComponent implements OnInit {
     },
     { key: 'contact', header: 'Contact', cell: (v: Volunteer) => v.contactPerson ? `${v.contactPerson.firstName} ${v.contactPerson.lastName}` : '—' },
     { key: 'areas', header: 'Areas', cell: (v: Volunteer) => (v.areas ?? []).map(a => a.name).join(', ') || '—' },
-    { key: 'onboardDate', header: 'Onboarded' },
+    { key: 'onboardDate', header: 'Onboarded', sortable: true },
     { key: 'isActive', header: 'Active', cell: (v: Volunteer) => v.isActive ? 'Yes' : 'No' },
   ];
 
@@ -104,12 +105,17 @@ export class VolunteerListComponent implements OnInit {
   }
 
   onPageChange(event: PageEvent): void {
-    this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.pageParams.set({ ...this.pageParams(), page: event.pageIndex, size: event.pageSize });
     this.loadPage();
   }
 
   onFilterChange(): void {
     this.pageParams.set({ ...this.pageParams(), page: 0 });
+    this.loadPage();
+  }
+
+  onSortChange(sort: string | null): void {
+    this.pageParams.set({ ...this.pageParams(), page: 0, sort: sort ?? undefined });
     this.loadPage();
   }
 

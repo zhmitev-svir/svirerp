@@ -15,6 +15,7 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -124,8 +125,12 @@ public class ZeffyImportService {
 
     // ── Batches ──────────────────────────────────────────────────────────────
 
+    /** Defaults to newest-first only when the caller didn't ask for a specific column sort. */
     public Page<ZeffyImportBatch> findBatchesByOrg(UUID orgId, Pageable pageable) {
-        return batchRepo.findByOrgIdOrderByUploadedAtDesc(orgId, pageable);
+        Pageable effective = pageable.getSort().isUnsorted()
+                ? PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(Sort.Direction.DESC, "uploadedAt"))
+                : pageable;
+        return batchRepo.findByOrgId(orgId, effective);
     }
 
     public ZeffyImportBatch findBatchById(UUID id) {

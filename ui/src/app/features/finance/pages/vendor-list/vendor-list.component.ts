@@ -66,7 +66,7 @@ export class VendorListComponent implements OnInit {
   }
 
   onPageChange(event: PageEvent): void {
-    this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.pageParams.set({ ...this.pageParams(), page: event.pageIndex, size: event.pageSize });
     this.loadPage();
   }
 

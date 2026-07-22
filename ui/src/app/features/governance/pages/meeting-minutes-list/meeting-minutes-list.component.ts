@@ -52,7 +52,8 @@ function excerpt(text: string | undefined, maxLength = 80): string {
         [data]="page()"
         [loading]="loading()"
         [pageParams]="pageParams()"
-        (pageChange)="onPageChange($event)" />
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)" />
     </div>
   `,
   styles: [`
@@ -76,7 +77,7 @@ export class MeetingMinutesListComponent implements OnInit {
   openActionItemsOnlyFilter = false;
 
   readonly columns: TableColumn[] = [
-    { key: 'meetingDate', header: 'Date' },
+    { key: 'meetingDate', header: 'Date', sortable: true },
     { key: 'title', header: 'Title' },
     { key: 'summary', header: 'Summary', cell: m => excerpt(m.summary) },
   ];
@@ -92,12 +93,17 @@ export class MeetingMinutesListComponent implements OnInit {
   }
 
   onPageChange(event: PageEvent): void {
-    this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.pageParams.set({ ...this.pageParams(), page: event.pageIndex, size: event.pageSize });
     this.loadPage();
   }
 
   onFilterChange(): void {
     this.pageParams.set({ ...this.pageParams(), page: 0 });
+    this.loadPage();
+  }
+
+  onSortChange(sort: string | null): void {
+    this.pageParams.set({ ...this.pageParams(), page: 0, sort: sort ?? undefined });
     this.loadPage();
   }
 

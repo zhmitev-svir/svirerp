@@ -18,7 +18,10 @@ export class ZeffyImportService {
   private readonly env = inject(ENVIRONMENT);
 
   getBatchesForOrg(orgId: string, params: PageParams = DEFAULT_PAGE_PARAMS): Observable<Page<ZeffyImportBatch>> {
-    const p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
+    let p = new HttpParams().set('page', String(params.page)).set('size', String(params.size));
+    if (params.sort) {
+      p = p.set('sort', params.sort);
+    }
     return this.http.get<Page<ZeffyImportBatch>>(
       `${this.env.apiUrl}/organizations/${orgId}/zeffy-imports`,
       { params: p },

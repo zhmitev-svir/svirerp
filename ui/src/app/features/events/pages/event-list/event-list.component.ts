@@ -55,7 +55,8 @@ function calendarSyncSummary(e: CalendarEvent): string {
         [data]="page()"
         [loading]="loading()"
         [pageParams]="pageParams()"
-        (pageChange)="onPageChange($event)" />
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)" />
     </div>
   `,
   styles: [`
@@ -81,7 +82,7 @@ export class EventListComponent implements OnInit {
   readonly columns: TableColumn[] = [
     { key: 'title', header: 'Title' },
     { key: 'eventType', header: 'Type', cell: (e: CalendarEvent) => e.eventType || '—' },
-    { key: 'startDatetime', header: 'Start' },
+    { key: 'startDatetime', header: 'Start', sortable: true },
     { key: 'location', header: 'Location', cell: (e: CalendarEvent) => e.location || '—' },
     { key: 'status', header: 'Status' },
     { key: 'calendarSync', header: 'Calendar Sync', cell: (e: CalendarEvent) => calendarSyncSummary(e) },
@@ -104,12 +105,17 @@ export class EventListComponent implements OnInit {
   }
 
   onPageChange(event: PageEvent): void {
-    this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.pageParams.set({ ...this.pageParams(), page: event.pageIndex, size: event.pageSize });
     this.loadPage();
   }
 
   onFilterChange(): void {
     this.pageParams.set({ ...this.pageParams(), page: 0 });
+    this.loadPage();
+  }
+
+  onSortChange(sort: string | null): void {
+    this.pageParams.set({ ...this.pageParams(), page: 0, sort: sort ?? undefined });
     this.loadPage();
   }
 

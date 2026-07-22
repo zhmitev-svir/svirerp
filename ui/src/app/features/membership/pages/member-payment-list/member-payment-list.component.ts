@@ -42,7 +42,8 @@ import { MemberPaymentFormComponent } from '../member-payment-form/member-paymen
         [data]="page()"
         [loading]="loading()"
         [pageParams]="pageParams()"
-        (pageChange)="onPageChange($event)" />
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)" />
     </div>
   `,
   styles: [`
@@ -65,9 +66,9 @@ export class MemberPaymentListComponent implements OnInit {
 
   readonly columns: TableColumn[] = [
     { key: 'name', header: 'Member Name', cell: (p: MemberPayment) => `${p.member.person.firstName} ${p.member.person.lastName}` },
-    { key: 'email', header: 'Member Email', cell: (p: MemberPayment) => p.member.person.email },
+    { key: 'email', header: 'Member Email', cell: (p: MemberPayment) => p.member.person.email, sortable: true, sortKey: 'member.person.email' },
     { key: 'amount', header: 'Amount', cell: (p: MemberPayment) => `$${Number(p.amount).toFixed(2)}` },
-    { key: 'paymentDate', header: 'Date' },
+    { key: 'paymentDate', header: 'Date', sortable: true },
   ];
 
   readonly actions: TableAction[] = [
@@ -86,12 +87,17 @@ export class MemberPaymentListComponent implements OnInit {
   }
 
   onPageChange(event: PageEvent): void {
-    this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.pageParams.set({ ...this.pageParams(), page: event.pageIndex, size: event.pageSize });
     this.loadPage();
   }
 
   onFilterChange(): void {
     this.pageParams.set({ ...this.pageParams(), page: 0 });
+    this.loadPage();
+  }
+
+  onSortChange(sort: string | null): void {
+    this.pageParams.set({ ...this.pageParams(), page: 0, sort: sort ?? undefined });
     this.loadPage();
   }
 

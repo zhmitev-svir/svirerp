@@ -16,6 +16,10 @@ public interface ZeffyImportBatchRepository extends JpaRepository<ZeffyImportBat
     @Override
     Optional<ZeffyImportBatch> findById(UUID id);
 
+    // Deliberately no hardcoded OrderBy in the method name — a derived query's own baked-in order
+    // would apply in addition to (not be overridden by) any client-supplied Pageable Sort, silently
+    // neutralizing column-header sorting. ZeffyImportService#findBatchesByOrg supplies the default
+    // uploadedAt-desc sort itself, only when the caller didn't ask for a specific one.
     @EntityGraph(attributePaths = {"org"})
-    Page<ZeffyImportBatch> findByOrgIdOrderByUploadedAtDesc(UUID orgId, Pageable pageable);
+    Page<ZeffyImportBatch> findByOrgId(UUID orgId, Pageable pageable);
 }

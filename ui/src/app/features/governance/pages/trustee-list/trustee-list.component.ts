@@ -44,7 +44,8 @@ function trusteeStatus(t: Trustee): 'Active' | 'Inactive' | 'Expired' {
         [data]="page()"
         [loading]="loading()"
         [pageParams]="pageParams()"
-        (pageChange)="onPageChange($event)" />
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)" />
     </div>
   `,
 })
@@ -62,8 +63,8 @@ export class TrusteeListComponent implements OnInit {
   readonly columns: TableColumn[] = [
     { key: 'person', header: 'Name', cell: t => `${t.person.firstName} ${t.person.lastName}` },
     { key: 'title', header: 'Title', cell: t => t.title || t.role },
-    { key: 'termStart', header: 'Term Start' },
-    { key: 'termEnd', header: 'Term End', cell: t => t.termEnd || '—' },
+    { key: 'termStart', header: 'Term Start', sortable: true },
+    { key: 'termEnd', header: 'Term End', cell: t => t.termEnd || '—', sortable: true },
     { key: 'status', header: 'Status', cell: t => trusteeStatus(t) },
     { key: 'isOfficer', header: 'Officer', cell: t => (t.isOfficer ? 'Yes' : 'No') },
   ];
@@ -84,7 +85,12 @@ export class TrusteeListComponent implements OnInit {
   }
 
   onPageChange(event: PageEvent): void {
-    this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.pageParams.set({ ...this.pageParams(), page: event.pageIndex, size: event.pageSize });
+    this.loadPage();
+  }
+
+  onSortChange(sort: string | null): void {
+    this.pageParams.set({ ...this.pageParams(), page: 0, sort: sort ?? undefined });
     this.loadPage();
   }
 

@@ -94,7 +94,8 @@ import { EventResourceFormComponent } from '../event-resource-form/event-resourc
           [data]="registrations()"
           [loading]="registrationsLoading()"
           [pageParams]="registrationPageParams()"
-          (pageChange)="onRegistrationPageChange($event)" />
+          (pageChange)="onRegistrationPageChange($event)"
+          (sortChange)="onRegistrationSortChange($event)" />
 
         <div class="section-header">
           <h2 class="mat-headline-6 section-title">Resources</h2>
@@ -149,7 +150,7 @@ export class EventDetailComponent implements OnInit {
 
   readonly registrationColumns: TableColumn[] = [
     { key: 'name', header: 'Person', cell: (r: EventRegistration) => `${r.person.firstName} ${r.person.lastName}` },
-    { key: 'email', header: 'Email', cell: (r: EventRegistration) => r.person.email },
+    { key: 'email', header: 'Email', cell: (r: EventRegistration) => r.person.email, sortable: true, sortKey: 'person.email' },
     { key: 'status', header: 'Status' },
     { key: 'feePaid', header: 'Fee Paid', cell: (r: EventRegistration) => `$${Number(r.feePaid ?? 0).toFixed(2)}` },
     { key: 'ticketNumber', header: 'Ticket #', cell: (r: EventRegistration) => r.ticketNumber || '—' },
@@ -180,12 +181,17 @@ export class EventDetailComponent implements OnInit {
   }
 
   onRegistrationPageChange(pageEvent: PageEvent): void {
-    this.registrationPageParams.set({ page: pageEvent.pageIndex, size: pageEvent.pageSize });
+    this.registrationPageParams.set({ ...this.registrationPageParams(), page: pageEvent.pageIndex, size: pageEvent.pageSize });
+    this.loadRegistrations();
+  }
+
+  onRegistrationSortChange(sort: string | null): void {
+    this.registrationPageParams.set({ ...this.registrationPageParams(), page: 0, sort: sort ?? undefined });
     this.loadRegistrations();
   }
 
   onResourcePageChange(pageEvent: PageEvent): void {
-    this.resourcePageParams.set({ page: pageEvent.pageIndex, size: pageEvent.pageSize });
+    this.resourcePageParams.set({ ...this.resourcePageParams(), page: pageEvent.pageIndex, size: pageEvent.pageSize });
     this.loadResources();
   }
 

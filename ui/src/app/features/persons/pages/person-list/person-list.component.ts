@@ -31,7 +31,8 @@ import { PersonFormComponent } from '../person-form/person-form.component';
         [data]="page()"
         [loading]="loading()"
         [pageParams]="pageParams()"
-        (pageChange)="onPageChange($event)" />
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)" />
     </div>
   `,
 })
@@ -47,7 +48,7 @@ export class PersonListComponent implements OnInit {
   readonly columns: TableColumn[] = [
     { key: 'firstName', header: 'First Name' },
     { key: 'lastName',  header: 'Last Name' },
-    { key: 'email',     header: 'Email' },
+    { key: 'email',     header: 'Email', sortable: true },
     { key: 'phone',     header: 'Phone' },
     { key: 'city',      header: 'City' },
   ];
@@ -62,7 +63,12 @@ export class PersonListComponent implements OnInit {
   }
 
   onPageChange(event: PageEvent): void {
-    this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.pageParams.set({ ...this.pageParams(), page: event.pageIndex, size: event.pageSize });
+    this.loadPage();
+  }
+
+  onSortChange(sort: string | null): void {
+    this.pageParams.set({ ...this.pageParams(), page: 0, sort: sort ?? undefined });
     this.loadPage();
   }
 

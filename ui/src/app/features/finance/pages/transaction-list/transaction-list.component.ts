@@ -63,7 +63,8 @@ function partyName(entry: JournalEntry): string {
         [loading]="loading()"
         [pageParams]="pageParams()"
         emptyMessage="No transactions yet."
-        (pageChange)="onPageChange($event)" />
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)" />
     </div>
   `,
   styles: [`
@@ -86,7 +87,7 @@ export class TransactionListComponent implements OnInit {
   fundFilter: string | null = null;
 
   readonly columns: TableColumn[] = [
-    { key: 'entryDate', header: 'Date' },
+    { key: 'entryDate', header: 'Date', sortable: true },
     { key: 'description', header: 'Description', cell: e => e.description || '—' },
     { key: 'categoryAccount', header: 'Category', cell: e => e.categoryAccount?.accountName ?? '—' },
     { key: 'fund', header: 'Project / Fund', cell: e => e.fund?.fundName ?? '—' },
@@ -105,12 +106,17 @@ export class TransactionListComponent implements OnInit {
   }
 
   onPageChange(event: PageEvent): void {
-    this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.pageParams.set({ ...this.pageParams(), page: event.pageIndex, size: event.pageSize });
     this.loadPage();
   }
 
   onFilterChange(): void {
     this.pageParams.set({ ...this.pageParams(), page: 0 });
+    this.loadPage();
+  }
+
+  onSortChange(sort: string | null): void {
+    this.pageParams.set({ ...this.pageParams(), page: 0, sort: sort ?? undefined });
     this.loadPage();
   }
 

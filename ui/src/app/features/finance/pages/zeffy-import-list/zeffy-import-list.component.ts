@@ -32,7 +32,8 @@ import { ZeffyImportUploadDialogComponent } from '../zeffy-import-upload-dialog/
         [loading]="loading()"
         [pageParams]="pageParams()"
         emptyMessage="No Zeffy imports yet."
-        (pageChange)="onPageChange($event)" />
+        (pageChange)="onPageChange($event)"
+        (sortChange)="onSortChange($event)" />
     </div>
   `,
 })
@@ -50,7 +51,7 @@ export class ZeffyImportListComponent implements OnInit {
 
   readonly columns: TableColumn[] = [
     { key: 'fileName', header: 'File', link: (b: ZeffyImportBatch) => this.openDetail(b) },
-    { key: 'uploadedAt', header: 'Uploaded', cell: (b: ZeffyImportBatch) => new Date(b.uploadedAt!).toLocaleString() },
+    { key: 'uploadedAt', header: 'Uploaded', cell: (b: ZeffyImportBatch) => new Date(b.uploadedAt!).toLocaleString(), sortable: true },
     { key: 'status', header: 'Status', cell: (b: ZeffyImportBatch) => (b.status === 'committed' ? 'Committed' : 'Preview only') },
     { key: 'rowCount', header: 'Rows' },
   ];
@@ -60,7 +61,12 @@ export class ZeffyImportListComponent implements OnInit {
   }
 
   onPageChange(event: PageEvent): void {
-    this.pageParams.set({ page: event.pageIndex, size: event.pageSize });
+    this.pageParams.set({ ...this.pageParams(), page: event.pageIndex, size: event.pageSize });
+    this.loadPage();
+  }
+
+  onSortChange(sort: string | null): void {
+    this.pageParams.set({ ...this.pageParams(), page: 0, sort: sort ?? undefined });
     this.loadPage();
   }
 
