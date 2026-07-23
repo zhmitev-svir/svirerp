@@ -1,4 +1,4 @@
-import { Component, input, output, computed, ChangeDetectionStrategy } from '@angular/core';
+import { Component, inject, input, output, computed, ChangeDetectionStrategy } from '@angular/core';
 import { PageEvent } from '@angular/material/paginator';
 import { MatTableModule } from '@angular/material/table';
 import { MatPaginatorModule } from '@angular/material/paginator';
@@ -7,6 +7,12 @@ import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatIconModule } from '@angular/material/icon';
 import { MatButtonModule } from '@angular/material/button';
 import { MatTooltipModule } from '@angular/material/tooltip';
+import { MatCardModule } from '@angular/material/card';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSelectModule } from '@angular/material/select';
+import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
+import { toSignal } from '@angular/core/rxjs-interop';
+import { map } from 'rxjs/operators';
 
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.model';
 
@@ -20,7 +26,9 @@ export interface TableColumn {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   link?: (row: any) => void;
   /** Makes the header clickable to sort — server-side, via the backend's Pageable/Sort, so the
-   *  whole dataset is sorted before paging, not just the current page. Clicking resets to page 1. */
+   *  whole dataset is sorted before paging, not just the current page. Clicking resets to page 1.
+   *  On mobile (card layout, no header row) this instead surfaces the column in the "Sort by"
+   *  dropdown above the cards. */
   sortable?: boolean;
   /** Backend sort property, if it differs from `key` (e.g. a nested path like "person.email", or
    *  because `key` is a computed/display-only column such as a joined name). Defaults to `key`. */
@@ -37,7 +45,12 @@ export interface TableAction {
 }
 
 /**
- * Generic paginated data table backed by Angular Material.
+ * Generic paginated data table backed by Angular Material. Below the Handset breakpoint, renders
+ * each row as a stacked card (label: value pairs) instead of a wide table row — a fixed-column
+ * mat-table just crushes illegibly on a phone rather than reflowing. Column-header sort clicks
+ * have no equivalent in card layout (no header row), so a compact "Sort by" control takes over
+ * there; both paths emit through the same (sortChange)/(pageChange) outputs, so callers don't
+ * need to know which layout is active.
  *
  * Usage:
  *   <app-data-table
@@ -60,6 +73,9 @@ export interface TableAction {
     MatIconModule,
     MatButtonModule,
     MatTooltipModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatSelectModule,
   ],
   template: `
     <div class="table-wrapper">
@@ -67,50 +83,106 @@ export interface TableAction {
         <mat-progress-bar mode="indeterminate" class="loading-bar" />
       }
 
-      <mat-table [dataSource]="rows()" matSort matSortDisableClear
-                 [matSortActive]="activeSortKey()"
-                 [matSortDirection]="activeSortDirection()"
-                 (matSortChange)="onSortChange($event)"
-                 class="data-table mat-elevation-z1">
+      @if (isMobile()) {
+        @if (sortableColumns().length) {
+          <div class="mobile-sort-bar">
+            <mat-form-field appearance="outline" class="mobile-sort-field">
+              <mat-label>Sort by</mat-label>
+              <mat-select [value]="activeSortKey() || null" (selectionChange)="onMobileSortKeyChange($event.value)">
+                @for (col of sortableColumns(); track col.key) {
+                  <mat-option [value]="col.sortKey ?? col.key">{{ col.header }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+            <button mat-icon-button [disabled]="!activeSortKey()"
+                    [matTooltip]="activeSortDirection() === 'desc' ? 'Descending — tap for ascending' : 'Ascending — tap for descending'"
+                    (click)="toggleMobileSortDirection()">
+              <mat-icon>{{ activeSortDirection() === 'desc' ? 'arrow_downward' : 'arrow_upward' }}</mat-icon>
+            </button>
+          </div>
+        }
 
-        @for (col of columns(); track col.key) {
-          <ng-container [matColumnDef]="col.key">
-            <mat-header-cell *matHeaderCellDef [mat-sort-header]="col.sortKey ?? col.key" [disabled]="!col.sortable">
-              {{ col.header }}
-            </mat-header-cell>
-            <mat-cell *matCellDef="let row">
-              @if (col.link) {
-                <a class="cell-link" (click)="col.link(row)">{{ col.cell ? col.cell(row) : (row[col.key] ?? '') }}</a>
-              } @else {
-                {{ col.cell ? col.cell(row) : (row[col.key] ?? '') }}
+        <div class="card-list">
+          @if (!rows().length) {
+            <p class="no-data-cell">{{ emptyMessage() }}</p>
+          }
+          @for (row of rows(); track row.id ?? $index) {
+            <mat-card class="data-card">
+              <mat-card-content>
+                @for (col of columns(); track col.key) {
+                  <div class="data-card-field">
+                    <span class="field-label">{{ col.header }}</span>
+                    <span class="field-value">
+                      @if (col.link) {
+                        <a class="cell-link" (click)="col.link(row)">{{ col.cell ? col.cell(row) : (row[col.key] ?? '') }}</a>
+                      } @else {
+                        {{ col.cell ? col.cell(row) : (row[col.key] ?? '') }}
+                      }
+                    </span>
+                  </div>
+                }
+              </mat-card-content>
+              @if (actions().length) {
+                <mat-card-actions class="data-card-actions">
+                  @for (act of actions(); track act.icon) {
+                    <button mat-icon-button
+                            [matTooltip]="act.label"
+                            [disabled]="act.disabled ? act.disabled(row) : false"
+                            (click)="act.action(row)">
+                      <mat-icon>{{ act.icon }}</mat-icon>
+                    </button>
+                  }
+                </mat-card-actions>
+              }
+            </mat-card>
+          }
+        </div>
+      } @else {
+        <mat-table [dataSource]="rows()" matSort matSortDisableClear
+                   [matSortActive]="activeSortKey()"
+                   [matSortDirection]="activeSortDirection()"
+                   (matSortChange)="onSortChange($event)"
+                   class="data-table mat-elevation-z1">
+
+          @for (col of columns(); track col.key) {
+            <ng-container [matColumnDef]="col.key">
+              <mat-header-cell *matHeaderCellDef [mat-sort-header]="col.sortKey ?? col.key" [disabled]="!col.sortable">
+                {{ col.header }}
+              </mat-header-cell>
+              <mat-cell *matCellDef="let row">
+                @if (col.link) {
+                  <a class="cell-link" (click)="col.link(row)">{{ col.cell ? col.cell(row) : (row[col.key] ?? '') }}</a>
+                } @else {
+                  {{ col.cell ? col.cell(row) : (row[col.key] ?? '') }}
+                }
+              </mat-cell>
+            </ng-container>
+          }
+
+          <ng-container matColumnDef="_actions">
+            <mat-header-cell *matHeaderCellDef class="actions-cell">Actions</mat-header-cell>
+            <mat-cell *matCellDef="let row" class="actions-cell">
+              @for (act of actions(); track act.icon) {
+                <button mat-icon-button
+                        [matTooltip]="act.label"
+                        [disabled]="act.disabled ? act.disabled(row) : false"
+                        (click)="act.action(row)">
+                  <mat-icon>{{ act.icon }}</mat-icon>
+                </button>
               }
             </mat-cell>
           </ng-container>
-        }
 
-        <ng-container matColumnDef="_actions">
-          <mat-header-cell *matHeaderCellDef class="actions-cell">Actions</mat-header-cell>
-          <mat-cell *matCellDef="let row" class="actions-cell">
-            @for (act of actions(); track act.icon) {
-              <button mat-icon-button
-                      [matTooltip]="act.label"
-                      [disabled]="act.disabled ? act.disabled(row) : false"
-                      (click)="act.action(row)">
-                <mat-icon>{{ act.icon }}</mat-icon>
-              </button>
-            }
-          </mat-cell>
-        </ng-container>
+          <mat-header-row *matHeaderRowDef="displayedColumns()" />
+          <mat-row *matRowDef="let row; columns: displayedColumns()" />
 
-        <mat-header-row *matHeaderRowDef="displayedColumns()" />
-        <mat-row *matRowDef="let row; columns: displayedColumns()" />
-
-        <tr class="mat-row no-data-row" *matNoDataRow>
-          <td [attr.colspan]="displayedColumns().length" class="no-data-cell">
-            {{ emptyMessage() }}
-          </td>
-        </tr>
-      </mat-table>
+          <tr class="mat-row no-data-row" *matNoDataRow>
+            <td [attr.colspan]="displayedColumns().length" class="no-data-cell">
+              {{ emptyMessage() }}
+            </td>
+          </tr>
+        </mat-table>
+      }
 
       <mat-paginator
         [length]="data()?.totalElements ?? 0"
@@ -127,12 +199,32 @@ export interface TableAction {
     .data-table { width: 100%; margin-top: 4px; }
     .actions-cell { justify-content: flex-end; min-width: 100px; }
     .no-data-row { display: block; }
-    .no-data-cell { text-align: center; padding: 32px; color: rgba(0,0,0,.54); display: block; }
+    .no-data-cell { text-align: center; padding: 32px; color: rgba(0,0,0,.54); display: block; margin: 0; }
     .cell-link { color: #3f51b5; cursor: pointer; text-decoration: none; }
     .cell-link:hover { text-decoration: underline; }
+
+    .mobile-sort-bar { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+    .mobile-sort-field { flex: 1; }
+
+    .card-list { display: flex; flex-direction: column; gap: 12px; margin-top: 4px; }
+    .data-card { width: 100%; box-sizing: border-box; }
+    .data-card-field {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 16px;
+      padding: 6px 0;
+      border-bottom: 1px solid rgba(0,0,0,.06);
+    }
+    .data-card-field:last-child { border-bottom: none; }
+    .field-label { color: rgba(0,0,0,.54); font-size: .8em; flex-shrink: 0; }
+    .field-value { text-align: right; word-break: break-word; }
+    .data-card-actions { justify-content: flex-end; padding: 4px 8px 8px; }
   `],
 })
 export class DataTableComponent {
+  private breakpoint = inject(BreakpointObserver);
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   data = input<Page<any> | null>(null);
   columns = input<TableColumn[]>([]);
@@ -146,17 +238,34 @@ export class DataTableComponent {
    *  PageParams.sort — the caller is expected to also reset page to 0 and reload. */
   sortChange = output<string | null>();
 
+  isMobile = toSignal(
+    this.breakpoint.observe(Breakpoints.Handset).pipe(map(r => r.matches)),
+    { initialValue: false },
+  );
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   rows = computed<any[]>(() => this.data()?.content ?? []);
   displayedColumns = computed(() => [
     ...this.columns().map(c => c.key),
     '_actions',
   ]);
+  sortableColumns = computed(() => this.columns().filter(c => c.sortable));
 
   activeSortKey = computed(() => this.pageParams().sort?.split(',')[0] ?? '');
   activeSortDirection = computed<SortDirection>(() => (this.pageParams().sort?.split(',')[1] as SortDirection) ?? '');
 
   onSortChange(sort: Sort): void {
     this.sortChange.emit(sort.direction ? `${sort.active},${sort.direction}` : null);
+  }
+
+  onMobileSortKeyChange(key: string): void {
+    this.sortChange.emit(`${key},asc`);
+  }
+
+  toggleMobileSortDirection(): void {
+    const key = this.activeSortKey();
+    if (!key) return;
+    const nextDirection = this.activeSortDirection() === 'desc' ? 'asc' : 'desc';
+    this.sortChange.emit(`${key},${nextDirection}`);
   }
 }
