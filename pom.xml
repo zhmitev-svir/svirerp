@@ -96,6 +96,19 @@
             <version>5.5.1</version>
         </dependency>
 
+        <!-- Stripe webhook signature verification (Webhook.constructEvent) and Stripe API calls
+             (e.g. listing Prices for the product-mapping admin screen). Pinned to the "dahlia"
+             release train (matches the church's Stripe account's API version, currently
+             2026-04-22.dahlia) — a webhook event's API version only needs to match this SDK's
+             pinned version's release train, not its exact date, for safe deserialization to
+             succeed (see EventDataObjectDeserializer). Bump this whenever Stripe ships a new train
+             the account has moved to. -->
+        <dependency>
+            <groupId>com.stripe</groupId>
+            <artifactId>stripe-java</artifactId>
+            <version>33.2.0</version>
+        </dependency>
+
         <!-- Lombok: reduces entity/DTO boilerplate (@Getter, @Builder, etc.) -->
         <dependency>
             <groupId>org.projectlombok</groupId>

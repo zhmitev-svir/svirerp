@@ -19,6 +19,8 @@ src/main/resources/application-local.properties
 src/main/resources/application-*.properties
 !src/main/resources/application.properties
 !src/main/resources/application-local.properties.example
+deploy.env
+!deploy.env.example
 
 # ── OS ────────────────────────────────────────────────────────────────────────
 .DS_Store

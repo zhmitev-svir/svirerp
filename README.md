@@ -50,12 +50,13 @@ svirerp/
 │       │   ├── volunteer/
 │       │   ├── finance/
 │       │   ├── zeffyimport/    # Zeffy payment import (.xlsx/.csv) — spans membership + finance
+│       │   ├── stripeintegration/  # Stripe webhook receiver — spans membership + finance
 │       │   ├── settings/       # Admin-only app_setting key/value store (Google OAuth creds, etc.)
 │       │   └── email/          # Gmail API email sending + Connect Gmail OAuth flow
 │       └── resources/
 │           ├── application.properties              # Base config (env-var placeholders)
 │           ├── application-local.properties.example  # Copy & fill for local dev
-│           └── db/migration/                       # Flyway V1–V41 SQL scripts
+│           └── db/migration/                       # Flyway V1–V42 SQL scripts
 ├── ui/                          # Angular 21 front-end (see Angular UI section)
 ├── mvnw                         # Unix Maven Wrapper
 ├── mvnw.cmd                     # Windows Maven Wrapper
@@ -232,6 +233,20 @@ The Email tab under Settings (`/settings/email`, migration V39) is a single gate
 - **Test** — every email is redirected to the configured `email.test-address` instead of its real recipient, content unchanged (no "would have gone to" annotation) — lets you verify email content/formatting before real people receive anything.
 
 No dedicated endpoints — both settings are read/written through the existing generic `GET /api/settings` / `PUT /api/settings/{key}`, same as any other setting; the Email tab is just a purpose-built radio-group UI over those two keys (the generic Settings → General page deliberately excludes `email.*` keys, same as it already does for `gmail.*`/`calendar.*`).
+
+### Stripe (payment webhook receiver)
+
+The Stripe tab under Settings (`/settings/stripe`, migration V42) lets svirerp receive completed Stripe payments — membership dues, paid church services (weddings, baptisms, etc.), event tickets, and general income like candles or room rentals — and post them straight into the Finance module. **svirerp never hosts a checkout page itself** — the church's WordPress site, a Stripe Invoice sent directly to a payer, and a mobile card-reader/Tap-to-Pay app for in-person food & drink sales at events all own the actual payment UI; svirerp only listens for Stripe's `checkout.session.completed` / `invoice.payment_succeeded` / `payment_intent.succeeded` webhook events and reacts to them, the same way the Zeffy payment import (see [API Overview](#api-overview)) turns an uploaded spreadsheet into `Person`/`Member`/`MemberPayment`/`JournalEntry` records — just triggered live instead of by a file upload.
+
+**One-time Stripe Dashboard setup:**
+
+1. In the Stripe Dashboard, add a webhook endpoint pointing at `{origin}/api/webhooks/stripe` (e.g. `https://svirerp.svivanrilski.com/api/webhooks/stripe` in prod — this endpoint is intentionally unauthenticated, see below), subscribed to the `checkout.session.completed`, `invoice.payment_succeeded`, and `payment_intent.succeeded` events. Both Checkout and Invoicing create a real PaymentIntent under the hood, so a single payment through either one fires its own event *and* a `payment_intent.succeeded` companion for the same payment — `StripeWebhookService` only treats a bare `payment_intent.succeeded` as actionable when it carries an explicit `price_id` metadata tag (the mobile Tap-to-Pay path), so the companion is deliberately ignored rather than double-posting.
+2. On the admin Settings → Stripe page, paste the **Secret Key** (`sk_live_...` / `sk_test_...`) and the webhook's **Signing Secret** (`whsec_...`) and save. Both are stored encrypted in `app_setting` (`stripe.secret-key`, `stripe.webhook-signing-secret`), same pattern as the Google/Gmail OAuth credentials — rotating either takes effect on the next webhook delivery, no restart needed.
+3. Under Finance → Stripe Mappings, map each Stripe Price to what a completed payment against it means: **Membership Dues** (posts a `MemberPayment` and recomputes the payer's Follower/Member/Benefactor tier, same as Zeffy), **Church Service** (creates a `ServiceRequest` for the office to schedule), **Event Ticket**, or **General Income** — plus which `Fund`/`Account` it posts to. The mapping list has a "Sync from Stripe" action that pulls in your account's current active Prices so you don't have to type Price IDs by hand.
+
+`POST /api/webhooks/stripe` is the one unauthenticated route under `/api/**` (see `SecurityConfig`) — Stripe calls it server-to-server with no session, authenticated instead by the request's `Stripe-Signature` header. A validly-signed event always gets a `200` back, even if applying it failed for a business reason (e.g. its Price isn't mapped yet) — Stripe would otherwise keep retrying for up to ~3 days, which wouldn't fix a mapping problem. Those events land under Finance → Stripe Payments with a status (`needs_mapping`/`error`/`processed`) and a **Reprocess** action once the underlying issue (usually: add the missing mapping) is fixed. A bad/forged signature gets a `400`; the secrets not being configured yet gets a `503`.
+
+An event's data object only deserializes "safely" when its Stripe API version's release train (e.g. `2026-04-22.dahlia`) matches the one the `stripe-java` dependency in `pom.xml` is pinned to — otherwise Stripe's own SDK refuses to risk silently-wrong field mapping and the request 500s. Keep that dependency's version bumped to whatever train the church's Stripe account is on (see the comment on the dependency in `pom.xml`); `StripeWebhookService#deserialize` also falls back to Stripe's `deserializeUnsafe()` for the gap in between an account moving trains and this dependency catching up.
 
 ---
 
@@ -435,6 +450,9 @@ All endpoints return JSON. Errors follow the envelope `{ timestamp, status, erro
 | Zeffy payment import | `POST /api/organizations/{id}/zeffy-imports/preview` | Multipart `.xlsx`/`.xls`/`.csv` — Zeffy's real export is an Excel spreadsheet, parsed via Apache POI (`.csv` also accepted); persists one row per line with a computed `outcome` (`ready`/`duplicate`/`skipped_status`/`unmapped_campaign`/`error`), no writes to `Person`/`Member`/`MemberPayment`/`JournalEntry` yet. `GET .../zeffy-imports`, `GET /api/zeffy-imports/{batchId}[/summary\|/rows]`, `POST /api/organizations/{id}/zeffy-imports/{batchId}/commit` — applies every still-eligible row, one DB transaction per row (`ZeffyImportRowApplier`) |
 | Zeffy campaign mappings | `GET /api/organizations/{id}/zeffy-campaign-mappings` | `POST .../zeffy-campaign-mappings/bulk`, `DELETE /api/zeffy-campaign-mappings/{id}` — persists which `Fund` a Zeffy "Campaign Title" posts income to, so recurring campaigns don't need remapping every import |
 | Recompute member tiers | `POST /api/organizations/{id}/members/recompute-tiers` | Re-runs Follower/Member/Benefactor tier computation for every member in the org — tier can go stale purely from elapsed time, not just new payments |
+| Stripe webhook (unauthenticated) | `POST /api/webhooks/stripe` | Checkout happens on WordPress, a Stripe Invoice, or a mobile card-reader app, never in svirerp — this is purely a receiver for `checkout.session.completed` / `invoice.payment_succeeded` / `payment_intent.succeeded`, authenticated by the `Stripe-Signature` header instead of a session. Always `200`s a validly-signed event (even on a business-rule failure — see [Admin Settings](#admin-settings)); `400` on a bad signature, `503` if the secrets aren't configured yet |
+| Stripe product mappings | `GET /api/organizations/{id}/stripe-product-mappings` | `POST .../stripe-product-mappings`, `PUT/DELETE /api/stripe-product-mappings/{id}` — routes a Stripe Price to a purpose (`membership_dues`/`service_request`/`event_ticket`/`general_income`) plus `Fund`/`Account`; `GET .../stripe-prices` lists active Prices straight from the Stripe API to map without waiting for a live payment |
+| Stripe payment events | `GET /api/organizations/{id}/stripe-events` | Audit log of every webhook received, with status (`received`/`processed`/`needs_mapping`/`error`/`ignored`) and the `Person`/`Member`/`MemberPayment`/`ServiceRequest`/`JournalEntry` it produced; `POST /api/stripe-events/{id}/reprocess` re-applies one once whatever blocked it (usually a missing mapping) is fixed |
 
 Pagination is available on all list endpoints via `?page=0&size=20&sort=field,asc`.
 
@@ -485,3 +503,4 @@ Pagination is available on all list endpoints via `?page=0&size=20&sort=field,as
 | V39 | `app_setting` rows for the central email switch (`email.mode` defaulting to `DISABLED`, `email.test-address`) — no new table, reuses V28's `app_setting` |
 | V40 | Widens `member_payment.payment_method`'s CHECK to accept `'zeffy'` (via `MODIFY COLUMN` — MariaDB 11.8 embeds this CHECK in the column definition itself, not as a droppable named table constraint) |
 | V41 | `zeffy_campaign_mapping` (org-scoped Campaign Title → `fund` mapping), `zeffy_import_batch`, `zeffy_import_row` (preview/commit staging area and permanent audit trail for the Zeffy payment import, one row per spreadsheet line with a computed `outcome`) |
+| V42 | `stripe_product_mapping` (org-scoped Stripe Price → purpose/`fund`/`account` routing), `stripe_webhook_event` (one row per webhook delivery, keyed by Stripe's event id for idempotency — the audit trail and "needs mapping"/"error"/reprocess staging area); widens `member_payment.payment_method` and `journal_entry.payment_method`'s CHECKs to accept `'stripe'`; seeds `stripe.secret-key`/`stripe.webhook-signing-secret` `app_setting` rows (reuses V28's `app_setting`) |

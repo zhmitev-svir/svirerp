@@ -73,7 +73,7 @@ export interface MemberPayment {
   member: Member;
   amount: number;
   paymentDate: string;
-  paymentMethod?: 'cash' | 'check' | 'credit_card' | 'ach' | 'online' | 'other' | 'zeffy';
+  paymentMethod?: 'cash' | 'check' | 'credit_card' | 'ach' | 'online' | 'other' | 'zeffy' | 'stripe';
   transactionRef?: string;
   periodStart?: string;
   periodEnd?: string;
@@ -331,7 +331,7 @@ export interface JournalEntry {
   totalCredit: number;
   // Transaction tags set by the Record Income / Record Expense flow — see RecordIncomeRequest /
   // RecordExpenseRequest. Denormalized for the transaction list; the ledger truth is the lines below.
-  paymentMethod?: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other';
+  paymentMethod?: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other' | 'stripe';
   checkNumber?: string;
   payer?: Person;
   vendor?: Vendor;
@@ -351,7 +351,7 @@ export interface RecordIncomeRequest {
   fundId?: string;
   payerId?: string;
   serviceRequestId?: string;
-  paymentMethod: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other';
+  paymentMethod: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other' | 'stripe';
   checkNumber?: string;
 }
 
@@ -363,7 +363,7 @@ export interface RecordExpenseRequest {
   paymentAccountId: string;
   fundId?: string;
   vendorId?: string;
-  paymentMethod: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other';
+  paymentMethod: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other' | 'stripe';
   checkNumber?: string;
 }
 
@@ -487,4 +487,42 @@ export interface ZeffyImportRow {
   memberPayment?: MemberPayment;
   journalEntry?: JournalEntry;
   fund?: Fund;
+}
+
+// ─── Stripe Integration ──────────────────────────────────────────────────────
+/** Routes a Stripe Price to what a completed payment against it means, and where it posts. */
+export interface StripeProductMapping {
+  id: string;
+  org: Organization;
+  stripePriceId: string;
+  displayName?: string;
+  purpose: 'membership_dues' | 'service_request' | 'event_ticket' | 'general_income';
+  fund?: Fund;
+  categoryAccount?: Account;
+  /** Only meaningful when purpose = service_request. */
+  serviceType?: 'wedding' | 'baptism' | 'funeral' | 'memorial' | 'blessing' | 'other';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** One row per Stripe webhook delivery — the audit trail linking back to whatever it produced. */
+export interface StripeWebhookEvent {
+  id: string;
+  org: Organization;
+  stripeEventId: string;
+  eventType: string;
+  stripePriceId?: string;
+  amount?: number;
+  email?: string;
+  firstName?: string;
+  lastName?: string;
+  status: 'received' | 'processed' | 'needs_mapping' | 'error' | 'ignored';
+  errorMessage?: string;
+  receivedAt?: string;
+  processedAt?: string;
+  person?: Person;
+  member?: Member;
+  memberPayment?: MemberPayment;
+  serviceRequest?: ServiceRequest;
+  journalEntry?: JournalEntry;
 }

@@ -25,6 +25,17 @@ public class OrganizationService {
                 .orElseThrow(() -> new ResourceNotFoundException("Organization", id));
     }
 
+    /**
+     * This is a single-org app (see {@link Organization}'s own doc comment) — there's no org
+     * picker, so a server-initiated flow with no org-scoped path parameter to work from (e.g. a
+     * Stripe webhook) resolves whichever single organization exists. Mirrors the frontend's
+     * OrgContextService#ensureOrgId.
+     */
+    public Organization getSingleOrganization() {
+        return repo.findAll(Pageable.ofSize(1)).stream().findFirst()
+                .orElseThrow(() -> new ResourceNotFoundException("No organization exists yet"));
+    }
+
     @Transactional
     public Organization create(Organization org) {
         return repo.save(org);

@@ -29,6 +29,10 @@ import { MatTabsModule } from '@angular/material/tabs';
          [active]="emailActive.isActive">
         Email
       </a>
+      <a mat-tab-link routerLink="stripe" routerLinkActive #stripeActive="routerLinkActive"
+         [active]="stripeActive.isActive">
+        Stripe
+      </a>
     </nav>
     <mat-tab-nav-panel #tabPanel>
       <router-outlet />

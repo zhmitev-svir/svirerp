@@ -86,3 +86,25 @@ export interface ZeffyCampaignMappingRequest {
 export interface RecomputeTiersResult {
   membersProcessed: number;
 }
+
+/** Request body for POST /api/organizations/{orgId}/stripe-product-mappings and
+ * PUT /api/stripe-product-mappings/{id}. */
+export interface StripeProductMappingRequest {
+  stripePriceId: string;
+  displayName?: string;
+  purpose: 'membership_dues' | 'service_request' | 'event_ticket' | 'general_income';
+  fundId?: string;
+  categoryAccountId?: string;
+  serviceType?: string;
+}
+
+/** Response shape of GET /api/organizations/{orgId}/stripe-prices — Prices pulled live from the
+ * connected Stripe account, so a mapping can be created before anything has ever been paid for
+ * through svirerp yet. amount/unitAmount is in the smallest currency unit (cents), as Stripe returns it. */
+export interface StripePriceInfo {
+  priceId: string;
+  displayName: string;
+  unitAmount?: number;
+  currency?: string;
+  alreadyMapped: boolean;
+}

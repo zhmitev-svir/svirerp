@@ -90,6 +90,10 @@ public class SecurityConfig {
         http
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/settings/**").hasRole("ADMIN")
+                        // Stripe calls this server-to-server with no session — authenticated
+                        // instead by the payload signature (see StripeWebhookController). Must be
+                        // matched before the blanket /api/** authenticated() rule below.
+                        .requestMatchers("/api/webhooks/**").permitAll()
                         .requestMatchers("/api/**").authenticated()
                         .anyRequest().permitAll())
                 .oauth2Login(oauth2 -> oauth2
@@ -115,7 +119,10 @@ public class SecurityConfig {
                 // POST/PUT/DELETE always 403s because no cookie has ever been issued.
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(CookieCsrfTokenRepository.withHttpOnlyFalse())
-                        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()))
+                        .csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler())
+                        // Stripe's webhook POST carries no XSRF-TOKEN cookie (it's not a browser
+                        // request) — verified instead by the Stripe-Signature header.
+                        .ignoringRequestMatchers("/api/webhooks/**"))
                 .addFilterAfter(new CsrfCookieFilter(), BasicAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex
                         .defaultAuthenticationEntryPointFor(jsonAuthenticationEntryPoint, new AntPathRequestMatcher("/api/**")))

@@ -27,7 +27,7 @@ public class MembershipService {
     private static final Set<String> MEMBER_STATUSES =
             Set.of("active", "inactive", "suspended", "expired", "pending");
     private static final Set<String> PAYMENT_METHODS =
-            Set.of("cash", "check", "credit_card", "ach", "online", "other", "zeffy");
+            Set.of("cash", "check", "credit_card", "ach", "online", "other", "zeffy", "stripe");
     private static final Set<String> PAYMENT_STATUSES =
             Set.of("pending", "completed", "failed", "refunded");
 

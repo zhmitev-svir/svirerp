@@ -44,6 +44,13 @@ export const settingsRoutes: Routes = [
             m => m.EmailSettingsComponent,
           ),
       },
+      {
+        path: 'stripe',
+        loadComponent: () =>
+          import('./pages/stripe-settings/stripe-settings.component').then(
+            m => m.StripeSettingsComponent,
+          ),
+      },
     ],
   },
 ];

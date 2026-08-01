@@ -43,7 +43,7 @@ public class FinanceService {
     private static final Set<String> BUDGET_PERIODS =
             Set.of("annual", "q1", "q2", "q3", "q4", "monthly");
     private static final Set<String> PAYMENT_METHODS =
-            Set.of("cash", "check", "zeffy", "bank_transfer", "card", "other");
+            Set.of("cash", "check", "zeffy", "bank_transfer", "card", "other", "stripe");
     private static final Set<String> SERVICE_TYPES =
             Set.of("wedding", "baptism", "funeral", "memorial", "blessing", "other");
     private static final Set<String> SERVICE_REQUEST_STATUSES =

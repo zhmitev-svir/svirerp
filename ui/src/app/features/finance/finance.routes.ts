@@ -43,6 +43,20 @@ export const financeRoutes: Routes = [
             m => m.ZeffyImportListComponent,
           ),
       },
+      {
+        path: 'stripe-mappings',
+        loadComponent: () =>
+          import('./pages/stripe-mapping-list/stripe-mapping-list.component').then(
+            m => m.StripeMappingListComponent,
+          ),
+      },
+      {
+        path: 'stripe-payments',
+        loadComponent: () =>
+          import('./pages/stripe-events-list/stripe-events-list.component').then(
+            m => m.StripeEventsListComponent,
+          ),
+      },
     ],
   },
   {
