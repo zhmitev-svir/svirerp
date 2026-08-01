@@ -183,6 +183,80 @@ class StripeWebhookEventApplierTest {
     }
 
     @Test
+    void applyEvent_withFee_resolvesFeeAccountAndPassesFeeThrough() {
+        StripeWebhookEvent event = baseEvent("received");
+        event.setFee(new BigDecimal("0.36"));
+        when(eventRepo.findById(event.getId())).thenReturn(Optional.of(event));
+
+        StripeProductMapping mapping = new StripeProductMapping();
+        mapping.setPurpose("general_income");
+        when(mappingRepo.findByOrgIdAndStripePriceId(orgId, "price_123")).thenReturn(Optional.of(mapping));
+
+        Person person = new Person();
+        person.setId(UUID.randomUUID());
+        when(personService.findByEmailIfExists(anyString())).thenReturn(Optional.of(person));
+        when(personService.findByEmail(anyString())).thenReturn(person);
+
+        when(financeService.findAccountsByOrg(eq(orgId), any(PageRequest.class))).thenReturn(Page.empty());
+        Account depositAccount = new Account();
+        depositAccount.setId(UUID.randomUUID());
+        Account categoryAccount = new Account();
+        categoryAccount.setId(UUID.randomUUID());
+        Account feeAccount = new Account();
+        feeAccount.setId(UUID.randomUUID());
+        when(financeService.findAccountByNumber(orgId, "1010")).thenReturn(depositAccount);
+        when(financeService.findAccountByNumber(orgId, "4090")).thenReturn(categoryAccount);
+        when(financeService.findOrCreateAccountByNumber(orgId, "5320", "Payment Processing Fees", "expense"))
+                .thenReturn(feeAccount);
+
+        JournalEntry entry = new JournalEntry();
+        entry.setId(UUID.randomUUID());
+        when(financeService.recordIncome(any(RecordIncomeRequest.class))).thenReturn(entry);
+
+        applier.applyEvent(event.getId());
+
+        ArgumentCaptor<RecordIncomeRequest> reqCaptor = ArgumentCaptor.forClass(RecordIncomeRequest.class);
+        verify(financeService).recordIncome(reqCaptor.capture());
+        assertThat(reqCaptor.getValue().feeAmount()).isEqualByComparingTo("0.36");
+        assertThat(reqCaptor.getValue().feeAccountId()).isEqualTo(feeAccount.getId());
+    }
+
+    @Test
+    void applyEvent_withoutFee_neverResolvesFeeAccount() {
+        StripeWebhookEvent event = baseEvent("received"); // fee left null by baseEvent()
+        when(eventRepo.findById(event.getId())).thenReturn(Optional.of(event));
+
+        StripeProductMapping mapping = new StripeProductMapping();
+        mapping.setPurpose("general_income");
+        when(mappingRepo.findByOrgIdAndStripePriceId(orgId, "price_123")).thenReturn(Optional.of(mapping));
+
+        Person person = new Person();
+        person.setId(UUID.randomUUID());
+        when(personService.findByEmailIfExists(anyString())).thenReturn(Optional.of(person));
+        when(personService.findByEmail(anyString())).thenReturn(person);
+
+        when(financeService.findAccountsByOrg(eq(orgId), any(PageRequest.class))).thenReturn(Page.empty());
+        Account depositAccount = new Account();
+        depositAccount.setId(UUID.randomUUID());
+        Account categoryAccount = new Account();
+        categoryAccount.setId(UUID.randomUUID());
+        when(financeService.findAccountByNumber(orgId, "1010")).thenReturn(depositAccount);
+        when(financeService.findAccountByNumber(orgId, "4090")).thenReturn(categoryAccount);
+
+        JournalEntry entry = new JournalEntry();
+        entry.setId(UUID.randomUUID());
+        when(financeService.recordIncome(any(RecordIncomeRequest.class))).thenReturn(entry);
+
+        applier.applyEvent(event.getId());
+
+        verify(financeService, never()).findOrCreateAccountByNumber(any(), any(), any(), any());
+        ArgumentCaptor<RecordIncomeRequest> reqCaptor = ArgumentCaptor.forClass(RecordIncomeRequest.class);
+        verify(financeService).recordIncome(reqCaptor.capture());
+        assertThat(reqCaptor.getValue().feeAmount()).isNull();
+        assertThat(reqCaptor.getValue().feeAccountId()).isNull();
+    }
+
+    @Test
     void applyEvent_serviceRequestPurpose_createsServiceRequest() {
         StripeWebhookEvent event = baseEvent("received");
         when(eventRepo.findById(event.getId())).thenReturn(Optional.of(event));

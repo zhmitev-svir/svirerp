@@ -353,6 +353,10 @@ export interface RecordIncomeRequest {
   serviceRequestId?: string;
   paymentMethod: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other' | 'stripe';
   checkNumber?: string;
+  /** A processing fee deducted before deposit (e.g. Stripe) — splits the entry into a net deposit
+   *  line plus a fee-expense line, both still summing to `amount`. Omit for sources with no fee. */
+  feeAmount?: number;
+  feeAccountId?: string;
 }
 
 export interface RecordExpenseRequest {
@@ -513,6 +517,8 @@ export interface StripeWebhookEvent {
   eventType: string;
   stripePriceId?: string;
   amount?: number;
+  /** Stripe's processing fee (from the underlying charge's BalanceTransaction), when resolvable. */
+  fee?: number;
   email?: string;
   firstName?: string;
   lastName?: string;

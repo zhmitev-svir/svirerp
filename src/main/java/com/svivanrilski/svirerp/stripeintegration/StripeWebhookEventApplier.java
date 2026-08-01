@@ -51,8 +51,8 @@ public class StripeWebhookEventApplier {
      *  constraint on stripe_event_id. */
     @Transactional
     public StripeWebhookEvent recordReceived(Organization org, String stripeEventId, String eventType,
-            String stripePriceId, BigDecimal amount, String email, String firstName, String lastName,
-            String payload) {
+            String stripePriceId, BigDecimal amount, BigDecimal fee, String email, String firstName,
+            String lastName, String payload) {
         if (eventRepo.existsByStripeEventId(stripeEventId)) {
             return null;
         }
@@ -63,6 +63,7 @@ public class StripeWebhookEventApplier {
                     .eventType(eventType)
                     .stripePriceId(stripePriceId)
                     .amount(amount)
+                    .fee(fee)
                     .email(email)
                     .firstName(firstName)
                     .lastName(lastName)
@@ -159,6 +160,9 @@ public class StripeWebhookEventApplier {
             }
         }
 
+        boolean hasFee = row.getFee() != null && row.getFee().signum() > 0;
+        UUID feeAccountId = hasFee ? resolveFeeAccount(orgId).getId() : null;
+
         JournalEntry entry = financeService.recordIncome(new RecordIncomeRequest(
                 orgId,
                 paymentDate,
@@ -170,7 +174,9 @@ public class StripeWebhookEventApplier {
                 person.getId(),
                 serviceRequest != null ? serviceRequest.getId() : null,
                 "stripe",
-                null));
+                null,
+                hasFee ? row.getFee() : null,
+                feeAccountId));
 
         row.setPerson(person);
         row.setMember(member);
@@ -223,6 +229,14 @@ public class StripeWebhookEventApplier {
             default -> "4090";
         };
         return financeService.findAccountByNumber(orgId, fallbackNumber);
+    }
+
+    /** Lazily creates "Payment Processing Fees" (5320) for this org if it doesn't exist yet — this
+     *  org may already have an established chart of accounts predating this account being added, so
+     *  the normal DEFAULT_ACCOUNTS seed (which only runs once, on an org's very first accounts
+     *  request) wouldn't otherwise pick it up. */
+    private Account resolveFeeAccount(UUID orgId) {
+        return financeService.findOrCreateAccountByNumber(orgId, "5320", "Payment Processing Fees", "expense");
     }
 
     private String buildNotes(StripeProductMapping mapping) {

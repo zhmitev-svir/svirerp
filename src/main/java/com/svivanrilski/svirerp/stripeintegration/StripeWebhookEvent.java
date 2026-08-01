@@ -54,6 +54,11 @@ public class StripeWebhookEvent {
     @Column(precision = 15, scale = 2)
     private BigDecimal amount;
 
+    /** Stripe's processing fee (from the underlying charge's BalanceTransaction), when resolvable —
+     *  null if it couldn't be looked up. Drives the fee-expense split in {@link StripeWebhookEventApplier}. */
+    @Column(precision = 15, scale = 2)
+    private BigDecimal fee;
+
     /** Captured from the Stripe event at receipt time (not re-derived from the payer's Person
      *  record) so a later "reprocess" action can re-run {@link StripeWebhookEventApplier#applyEvent}
      *  without re-parsing the raw Stripe payload. */

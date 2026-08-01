@@ -372,7 +372,8 @@ public class FinanceController {
             @RequestBody RecordIncomeRequest body) {
         RecordIncomeRequest req = new RecordIncomeRequest(orgId, body.entryDate(), body.amount(),
                 body.description(), body.categoryAccountId(), body.depositAccountId(), body.fundId(),
-                body.payerId(), body.serviceRequestId(), body.paymentMethod(), body.checkNumber());
+                body.payerId(), body.serviceRequestId(), body.paymentMethod(), body.checkNumber(),
+                body.feeAmount(), body.feeAccountId());
         return ResponseEntity.status(HttpStatus.CREATED).body(service.recordIncome(req));
     }
 

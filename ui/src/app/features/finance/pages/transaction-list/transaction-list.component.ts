@@ -13,10 +13,11 @@ import { OrgContextService } from '../../../../core/services/org-context.service
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Fund, JournalEntry } from '../../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../../core/models/api.model';
-import { DataTableComponent, TableColumn } from '../../../../shared/components/data-table/data-table.component';
+import { DataTableComponent, TableColumn, TableAction } from '../../../../shared/components/data-table/data-table.component';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { IncomeFormComponent } from '../income-form/income-form.component';
 import { ExpenseFormComponent } from '../expense-form/expense-form.component';
+import { JournalEntryDetailDialogComponent } from '../journal-entry-detail-dialog/journal-entry-detail-dialog.component';
 
 function partyName(entry: JournalEntry): string {
   if (entry.payer) return `${entry.payer.firstName} ${entry.payer.lastName}`;
@@ -59,6 +60,7 @@ function partyName(entry: JournalEntry): string {
 
       <app-data-table
         [columns]="columns"
+        [actions]="actions"
         [data]="page()"
         [loading]="loading()"
         [pageParams]="pageParams()"
@@ -101,6 +103,10 @@ export class TransactionListComponent implements OnInit {
     { key: 'status', header: 'Status' },
   ];
 
+  readonly actions: TableAction[] = [
+    { icon: 'receipt_long', label: 'View Detail', action: (e: JournalEntry) => this.openDetail(e) },
+  ];
+
   ngOnInit(): void {
     this.loadPage();
   }
@@ -129,6 +135,10 @@ export class TransactionListComponent implements OnInit {
       .open(IncomeFormComponent, { width: '560px', data: { orgId: this.orgId } })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadPage(); });
+  }
+
+  openDetail(entry: JournalEntry): void {
+    this.dialog.open(JournalEntryDetailDialogComponent, { width: '560px', data: { entry } });
   }
 
   openExpenseForm(): void {

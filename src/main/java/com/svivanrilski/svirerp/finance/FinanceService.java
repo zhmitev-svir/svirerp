@@ -69,6 +69,7 @@ public class FinanceService {
         {"5210", "Event Services Expense", "expense"},
         {"5300", "Construction & Repairs Expense", "expense"},
         {"5310", "Consulting & Professional Fees Expense", "expense"},
+        {"5320", "Payment Processing Fees", "expense"},
         {"5900", "Other Expense", "expense"},
     };
 
@@ -182,6 +183,29 @@ public class FinanceService {
         return accountRepo.findByOrgIdAndAccountNumber(orgId, accountNumber)
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Account " + accountNumber + " not found for org " + orgId));
+    }
+
+    /**
+     * Finds an account by number, creating it if missing — for an account introduced to
+     * {@link #DEFAULT_ACCOUNTS} after an org's chart of accounts was already seeded (seeding only
+     * runs once, on an org's very first accounts request — see {@link #findAccountsByOrg}), so an
+     * already-established org would otherwise never pick up a newly-added default account.
+     */
+    @Transactional
+    public Account findOrCreateAccountByNumber(UUID orgId, String accountNumber, String accountName, String accountType) {
+        return accountRepo.findByOrgIdAndAccountNumber(orgId, accountNumber).orElseGet(() -> {
+            Organization org = orgService.findById(orgId);
+            String normalBalance = "asset".equals(accountType) || "expense".equals(accountType) ? "debit" : "credit";
+            return accountRepo.save(Account.builder()
+                    .org(org)
+                    .accountNumber(accountNumber)
+                    .accountName(accountName)
+                    .accountType(accountType)
+                    .normalBalance(normalBalance)
+                    .isActive(true)
+                    .isSystem(false)
+                    .build());
+        });
     }
 
     @Transactional
@@ -691,6 +715,20 @@ public class FinanceService {
         ServiceRequest serviceRequest = req.serviceRequestId() != null
                 ? findServiceRequestById(req.serviceRequestId()) : null;
 
+        // A processing fee (e.g. Stripe) deducted before deposit means the amount actually
+        // banked is less than the gross amount recorded as income — split the deposit line into
+        // net + a fee expense line rather than (incorrectly) depositing the full gross. Guards
+        // against a fee that's zero/negative/>= the gross amount (shouldn't happen with a real
+        // Stripe fee, but a bad value here should degrade to the plain 2-line entry, not corrupt
+        // the books or violate the one-sided-JournalLine DB constraint).
+        boolean hasFee = req.feeAmount() != null && req.feeAmount().signum() > 0
+                && req.feeAmount().compareTo(req.amount()) < 0;
+        BigDecimal depositAmount = hasFee ? req.amount().subtract(req.feeAmount()) : req.amount();
+        Account feeAccount = hasFee ? findAccountById(req.feeAccountId()) : null;
+        if (hasFee) {
+            requireAccountType(feeAccount, "expense", "Fee account");
+        }
+
         JournalEntry entry = journalEntryRepo.save(JournalEntry.builder()
                 .org(org)
                 .entryDate(req.entryDate())
@@ -709,8 +747,14 @@ public class FinanceService {
 
         journalLineRepo.save(JournalLine.builder()
                 .journalEntry(entry).account(deposit).fund(fund)
-                .debitAmount(req.amount()).creditAmount(BigDecimal.ZERO)
+                .debitAmount(depositAmount).creditAmount(BigDecimal.ZERO)
                 .memo(req.description()).build());
+        if (hasFee) {
+            journalLineRepo.save(JournalLine.builder()
+                    .journalEntry(entry).account(feeAccount).fund(fund)
+                    .debitAmount(req.feeAmount()).creditAmount(BigDecimal.ZERO)
+                    .memo("Payment processing fee").build());
+        }
         journalLineRepo.save(JournalLine.builder()
                 .journalEntry(entry).account(category).fund(fund)
                 .debitAmount(BigDecimal.ZERO).creditAmount(req.amount())

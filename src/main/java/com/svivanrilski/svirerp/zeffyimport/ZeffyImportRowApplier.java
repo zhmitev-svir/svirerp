@@ -120,6 +120,8 @@ public class ZeffyImportRowApplier {
                         person.getId(),
                         null,
                         "zeffy",
+                        null,
+                        null,
                         null))
                 : null;
 

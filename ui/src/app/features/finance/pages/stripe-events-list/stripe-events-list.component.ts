@@ -58,6 +58,7 @@ export class StripeEventsListComponent implements OnInit {
     { key: 'eventType', header: 'Event', cell: (e: StripeWebhookEvent) => e.eventType },
     { key: 'payer', header: 'Payer', cell: (e: StripeWebhookEvent) => e.person ? `${e.person.firstName} ${e.person.lastName}` : (e.email || '—') },
     { key: 'amount', header: 'Amount', cell: (e: StripeWebhookEvent) => e.amount != null ? e.amount.toFixed(2) : '—' },
+    { key: 'fee', header: 'Fee', cell: (e: StripeWebhookEvent) => e.fee != null ? e.fee.toFixed(2) : '—' },
     { key: 'status', header: 'Status', cell: (e: StripeWebhookEvent) => STATUS_LABELS[e.status] ?? e.status },
     { key: 'detail', header: 'Detail', cell: (e: StripeWebhookEvent) => this.detailFor(e) },
   ];
@@ -83,7 +84,9 @@ export class StripeEventsListComponent implements OnInit {
   detailFor(event: StripeWebhookEvent): string {
     if (event.status === 'error') return event.errorMessage || 'Unknown error';
     if (event.status === 'needs_mapping') return `Price ${event.stripePriceId ?? '(none)'} isn't mapped yet`;
-    if (event.status === 'processed') return 'Posted to Finance';
+    if (event.status === 'processed') {
+      return event.fee != null ? `Posted to Finance (fee $${event.fee.toFixed(2)})` : 'Posted to Finance';
+    }
     if (event.status === 'ignored') return event.errorMessage || 'Not actionable';
     return '—';
   }

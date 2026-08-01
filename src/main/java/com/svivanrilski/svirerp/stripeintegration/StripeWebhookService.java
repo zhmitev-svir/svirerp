@@ -3,10 +3,13 @@ package com.svivanrilski.svirerp.stripeintegration;
 import com.stripe.exception.EventDataObjectDeserializationException;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.exception.StripeException;
+import com.stripe.model.BalanceTransaction;
+import com.stripe.model.Charge;
 import com.stripe.model.Event;
 import com.stripe.model.EventDataObjectDeserializer;
 import com.stripe.model.Invoice;
 import com.stripe.model.InvoiceLineItem;
+import com.stripe.model.InvoicePayment;
 import com.stripe.model.LineItem;
 import com.stripe.model.PaymentIntent;
 import com.stripe.model.Price;
@@ -15,6 +18,7 @@ import com.stripe.model.checkout.Session;
 import com.stripe.net.RequestOptions;
 import com.stripe.net.Webhook;
 import com.stripe.param.InvoiceRetrieveParams;
+import com.stripe.param.PaymentIntentRetrieveParams;
 import com.stripe.param.PriceListParams;
 import com.stripe.param.checkout.SessionRetrieveParams;
 import lombok.RequiredArgsConstructor;
@@ -93,9 +97,10 @@ public class StripeWebhookService {
      *  at all. Only an event type this endpoint isn't subscribed to skips recording entirely
      *  (see {@link #parse}). */
     private record ParsedEvent(
-            String priceId, BigDecimal amount, String email, String firstName, String lastName, String ignoreReason) {
+            String priceId, BigDecimal amount, BigDecimal feeAmount, String email, String firstName,
+            String lastName, String ignoreReason) {
         static ParsedEvent ignored(String reason) {
-            return new ParsedEvent(null, null, null, null, null, reason);
+            return new ParsedEvent(null, null, null, null, null, null, reason);
         }
     }
 
@@ -124,7 +129,8 @@ public class StripeWebhookService {
 
         Organization org = orgService.getSingleOrganization();
         StripeWebhookEvent row = applier.recordReceived(org, event.getId(), event.getType(),
-                parsed.priceId(), parsed.amount(), parsed.email(), parsed.firstName(), parsed.lastName(), payload);
+                parsed.priceId(), parsed.amount(), parsed.feeAmount(), parsed.email(), parsed.firstName(),
+                parsed.lastName(), payload);
         if (row == null) {
             return; // a concurrent delivery of the same event won the race
         }
@@ -163,8 +169,9 @@ public class StripeWebhookService {
         BigDecimal amount = session.getAmountTotal() != null
                 ? BigDecimal.valueOf(session.getAmountTotal()).movePointLeft(2) : null;
         String priceId = resolveLineItemPriceId(session.getId());
+        BigDecimal fee = feeAmountFor(session.getPaymentIntent());
         String[] nameParts = splitName(name);
-        return new ParsedEvent(priceId, amount, email, nameParts[0], nameParts[1], null);
+        return new ParsedEvent(priceId, amount, fee, email, nameParts[0], nameParts[1], null);
     }
 
     /** A Stripe Invoice sent directly to a payer (e.g. dues billed outside a WordPress checkout) —
@@ -176,8 +183,9 @@ public class StripeWebhookService {
         }
         BigDecimal amount = BigDecimal.valueOf(invoice.getAmountPaid()).movePointLeft(2);
         String priceId = resolveInvoiceLineItemPriceId(invoice);
+        BigDecimal fee = feeAmountFor(resolveInvoicePaymentIntentId(invoice));
         String[] nameParts = splitName(invoice.getCustomerName());
-        return new ParsedEvent(priceId, amount, invoice.getCustomerEmail(), nameParts[0], nameParts[1], null);
+        return new ParsedEvent(priceId, amount, fee, invoice.getCustomerEmail(), nameParts[0], nameParts[1], null);
     }
 
     private String resolveInvoiceLineItemPriceId(Invoice invoice) {
@@ -209,6 +217,35 @@ public class StripeWebhookService {
                 ? pricing.getPriceDetails().getPrice() : null;
     }
 
+    /** The PaymentIntent ID behind this invoice's payment — needed to look up the BalanceTransaction
+     *  for the processing fee (see {@link #feeAmountFor}). Same embedded-then-re-fetch fallback as
+     *  {@link #resolveInvoiceLineItemPriceId}. */
+    private String resolveInvoicePaymentIntentId(Invoice invoice) {
+        String id = firstInvoicePaymentIntentId(invoice);
+        if (id != null) {
+            return id;
+        }
+        try {
+            InvoiceRetrieveParams params = InvoiceRetrieveParams.builder()
+                    .addExpand("payments.data.payment.payment_intent")
+                    .build();
+            Invoice full = Invoice.retrieve(invoice.getId(), params, stripeRequestOptions());
+            return firstInvoicePaymentIntentId(full);
+        } catch (StripeException e) {
+            log.warn("Failed to retrieve payment info for Stripe Invoice {}: {}", invoice.getId(), e.getMessage());
+            return null;
+        }
+    }
+
+    private String firstInvoicePaymentIntentId(Invoice invoice) {
+        if (invoice.getPayments() == null || invoice.getPayments().getData() == null
+                || invoice.getPayments().getData().isEmpty()) {
+            return null;
+        }
+        InvoicePayment.Payment payment = invoice.getPayments().getData().get(0).getPayment();
+        return payment != null ? payment.getPaymentIntent() : null;
+    }
+
     private ParsedEvent parsePaymentIntent(Event event) {
         PaymentIntent intent = (PaymentIntent) deserialize(event);
         // A standalone PaymentIntent (the mobile Tap-to-Pay path, with no Checkout Session
@@ -225,7 +262,34 @@ public class StripeWebhookService {
         String email = intent.getReceiptEmail();
         BigDecimal amount = intent.getAmount() != null
                 ? BigDecimal.valueOf(intent.getAmount()).movePointLeft(2) : null;
-        return new ParsedEvent(priceId, amount, email, null, null, null);
+        BigDecimal fee = feeAmountFor(intent.getId());
+        return new ParsedEvent(priceId, amount, fee, email, null, null, null);
+    }
+
+    /**
+     * Stripe deducts its processing fee before ever depositing to the bank — the BalanceTransaction
+     * behind a PaymentIntent's latest Charge has already computed it (`fee`) by the time the payment
+     * succeeds, so this is available synchronously, no need to wait for the eventual payout. Returns
+     * null (not zero) on any failure to resolve it — FinanceService#recordIncome falls back to a
+     * plain 2-line entry (no fee split) rather than fail the whole payment over fee-lookup trouble.
+     */
+    private BigDecimal feeAmountFor(String paymentIntentId) {
+        if (paymentIntentId == null || paymentIntentId.isBlank()) {
+            return null;
+        }
+        try {
+            PaymentIntentRetrieveParams params = PaymentIntentRetrieveParams.builder()
+                    .addExpand("latest_charge.balance_transaction")
+                    .build();
+            PaymentIntent full = PaymentIntent.retrieve(paymentIntentId, params, stripeRequestOptions());
+            Charge charge = full.getLatestChargeObject();
+            BalanceTransaction balanceTransaction = charge != null ? charge.getBalanceTransactionObject() : null;
+            return balanceTransaction != null && balanceTransaction.getFee() != null
+                    ? BigDecimal.valueOf(balanceTransaction.getFee()).movePointLeft(2) : null;
+        } catch (StripeException e) {
+            log.warn("Failed to retrieve balance transaction for PaymentIntent {}: {}", paymentIntentId, e.getMessage());
+            return null;
+        }
     }
 
     /**

@@ -2,7 +2,7 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ENVIRONMENT } from '../../../core/tokens/environment.token';
-import { JournalEntry, RecordExpenseRequest, RecordIncomeRequest } from '../../../core/models/domain.model';
+import { JournalEntry, JournalLine, RecordExpenseRequest, RecordIncomeRequest } from '../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.model';
 
 export interface TransactionFilter {
@@ -57,5 +57,11 @@ export class FinanceTransactionService {
       `${this.env.apiUrl}/organizations/${orgId}/expense-transactions`,
       request,
     );
+  }
+
+  /** The real double-entry lines behind an entry — e.g. reveals a processing-fee split
+   *  (deposit net + fee expense + revenue gross) that the entry-level totalDebit alone hides. */
+  getLines(entryId: string): Observable<JournalLine[]> {
+    return this.http.get<JournalLine[]>(`${this.env.apiUrl}/journal-entries/${entryId}/lines`);
   }
 }
