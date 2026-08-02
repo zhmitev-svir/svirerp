@@ -12,7 +12,6 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { forkJoin } from 'rxjs';
 
 import { PersonService } from '../../../persons/services/person.service';
 import { PersonFormComponent } from '../../../persons/pages/person-form/person-form.component';
@@ -70,15 +69,12 @@ export interface VolunteerFormData {
         </div>
 
         <div class="form-row">
-          <mat-form-field appearance="outline" class="flex-1">
-            <mat-label>Contact Person</mat-label>
-            <mat-select formControlName="contactPersonId">
-              <mat-option [value]="null">No contact</mat-option>
-              @for (p of persons(); track p.id) {
-                <mat-option [value]="p.id">{{ p.firstName }} {{ p.lastName }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
+          <app-autocomplete class="flex-1"
+              formControlName="contactPersonId"
+              label="Contact Person"
+              [searchFn]="searchByFirstName"
+              [displayFn]="personLabel"
+              [initialLabel]="contactPersonLabel()" />
           <button mat-icon-button type="button" matTooltip="Add new person"
                   (click)="addPerson('contact')">
             <mat-icon>person_add</mat-icon>
@@ -173,9 +169,9 @@ export class VolunteerFormComponent implements OnInit {
   addingArea = signal(false);
   newAreaName = '';
 
-  persons = signal<Person[]>([]);
   areas = signal<VolunteerArea[]>([]);
   volunteerLabel = signal('');
+  contactPersonLabel = signal('');
 
   personLabel = personLabel;
   searchByFirstName = (q: string) => this.personService.search('firstName', q);
@@ -192,12 +188,8 @@ export class VolunteerFormComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    forkJoin({
-      persons: this.personService.getPage({ page: 0, size: 200 }),
-      areas: this.areaService.getPageForOrg(this.orgId, { page: 0, size: 100 }),
-    }).subscribe(({ persons, areas }) => {
-      this.persons.set(persons.content);
-      this.areas.set(areas.content);
+    this.areaService.getPageForOrg(this.orgId, { page: 0, size: 100 }).subscribe(page => {
+      this.areas.set(page.content);
     });
 
     if (this.entity) {
@@ -212,6 +204,9 @@ export class VolunteerFormComponent implements OnInit {
         notes: this.entity.notes ?? '',
       });
       this.volunteerLabel.set(personLabel(this.entity.person));
+      if (this.entity.contactPerson) {
+        this.contactPersonLabel.set(personLabel(this.entity.contactPerson));
+      }
     }
   }
 
@@ -221,12 +216,12 @@ export class VolunteerFormComponent implements OnInit {
       .afterClosed()
       .subscribe((created: Person | undefined) => {
         if (!created) return;
-        this.persons.update(list => [...list, created]);
         if (target === 'volunteer') {
           this.form.controls.personId.setValue(created.id);
           this.volunteerLabel.set(personLabel(created));
         } else {
           this.form.controls.contactPersonId.setValue(created.id);
+          this.contactPersonLabel.set(personLabel(created));
         }
       });
   }

@@ -1,11 +1,13 @@
 import {
   Component, DestroyRef, ChangeDetectionStrategy, OnInit,
-  inject, input, signal, output, effect,
+  inject, input, signal, output, effect, computed,
 } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { ControlValueAccessor, FormControl, NgControl, ReactiveFormsModule } from '@angular/forms';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
+import { MatIconModule } from '@angular/material/icon';
+import { MatButtonModule } from '@angular/material/button';
 import { MatAutocompleteModule, MatAutocompleteSelectedEvent } from '@angular/material/autocomplete';
 import { Observable, of, timer } from 'rxjs';
 import { debounce, switchMap } from 'rxjs/operators';
@@ -28,20 +30,30 @@ import { debounce, switchMap } from 'rxjs/operators';
  * the full object — there's no reverse lookup here. Callers that already hold the full entity
  * (edit-mode prefill, or a just-created record from a quick-add dialog) pass its display text via
  * `[initialLabel]` so the field shows something meaningful instead of a blank box.
+ *
+ * A clear (×) button appears whenever there's text, regardless of whether the bound control is
+ * required — it just resets the value to null; required-ness is still enforced by the form's own
+ * validators (and shown via the internal `<mat-error>` above), not by hiding the ability to clear.
  */
 @Component({
   selector: 'app-autocomplete',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatAutocompleteModule],
+  imports: [ReactiveFormsModule, MatFormFieldModule, MatInputModule, MatIconModule, MatButtonModule, MatAutocompleteModule],
   template: `
     <mat-form-field appearance="outline" class="full-width">
       <mat-label>{{ label() }}</mat-label>
       <input matInput
              [formControl]="searchControl"
              [matAutocomplete]="auto"
-             [placeholder]="placeholder()"
+             [placeholder]="effectivePlaceholder()"
              (blur)="onTouched()" />
+      @if (searchControl.value) {
+        <button matSuffix mat-icon-button type="button" tabindex="-1"
+                [attr.aria-label]="'Clear ' + label()" (click)="clear()">
+          <mat-icon>close</mat-icon>
+        </button>
+      }
       <mat-autocomplete #auto="matAutocomplete" (optionSelected)="onOptionSelected($event)">
         @for (item of results(); track $index) {
           <mat-option [value]="item">{{ displayFn()(item) }}</mat-option>
@@ -66,8 +78,16 @@ export class AutocompleteComponent<T> implements ControlValueAccessor, OnInit {
   displayFn = input.required<(item: T) => string>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   valueFn = input<(item: T) => string>((item: any) => item?.id);
+  /** Empty means "derive from minLength" (see effectivePlaceholder) — pass an explicit string to
+   *  override with custom text instead. */
   placeholder = input<string>('');
   minLength = input<number>(4);
+
+  /** Defaults to "Begin typing (min N characters)" using this instance's own minLength, so the
+   *  hint always matches whatever actually triggers a search — not a hardcoded number that could
+   *  drift out of sync if minLength is ever overridden. */
+  effectivePlaceholder = computed(() =>
+    this.placeholder() || `Begin typing (min ${this.minLength()} characters)`);
   debounceMs = input<number>(300);
   initialLabel = input<string>('');
   errorText = input<string>('Required');
@@ -117,6 +137,14 @@ export class AutocompleteComponent<T> implements ControlValueAccessor, OnInit {
     this.searchControl.setValue(this.displayFn()(item), { emitEvent: false });
     this.onChange(this.valueFn()(item));
     this.selectionChange.emit(item);
+  }
+
+  clear(): void {
+    this.searchControl.setValue('', { emitEvent: false });
+    this.results.set([]);
+    this.onChange(null);
+    this.onTouched();
+    this.selectionChange.emit(null);
   }
 
   writeValue(value: string | null): void {
