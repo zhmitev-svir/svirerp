@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.EntityGraph;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.stereotype.Repository;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -23,4 +24,8 @@ public interface FundRepository extends JpaRepository<Fund, UUID> {
 
     @EntityGraph(attributePaths = {"org"})
     Page<Fund> findByOrgIdAndIsActive(UUID orgId, boolean isActive, Pageable pageable);
+
+    /** Unpaginated — Funds Overview needs every active fund at once, not a page of them. */
+    @EntityGraph(attributePaths = {"org"})
+    List<Fund> findByOrgIdAndIsActiveOrderByFundName(UUID orgId, boolean isActive);
 }

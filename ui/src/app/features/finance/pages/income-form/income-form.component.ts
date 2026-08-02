@@ -103,7 +103,9 @@ interface IncomeDialogData {
             <mat-label>Payment Method</mat-label>
             <mat-select formControlName="paymentMethod">
               <mat-option value="zeffy">Zeffy</mat-option>
+              <mat-option value="facebook">Facebook</mat-option>
               <mat-option value="cash">Cash</mat-option>
+              <mat-option value="zelle">Zelle</mat-option>
               <mat-option value="check">Check</mat-option>
               <mat-option value="bank_transfer">Bank Transfer</mat-option>
               <mat-option value="card">Card</mat-option>

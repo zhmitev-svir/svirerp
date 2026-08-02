@@ -440,7 +440,12 @@ public class ZeffyImportService {
         membershipService.ensureZeffyTierTypesSeeded(orgId);
         financeService.findAccountsByOrg(orgId, PageRequest.of(0, 1)); // triggers lazy chart-of-accounts seed
         Account categoryAccount = financeService.findAccountByNumber(orgId, "4010");
-        Account depositAccount = financeService.findAccountByNumber(orgId, "1010");
+        // Zeffy holds donations and pays out to the real bank in periodic lump sums — post to its
+        // clearing account rather than Checking directly, so Checking only grows when the actual
+        // payout lands (see FinanceService#recordTransfer / DEFAULT_ACCOUNTS). findOrCreateAccountByNumber
+        // retrofits this org's already-established chart of accounts the same way the Stripe
+        // integration's fee account (5320) is retrofitted.
+        Account depositAccount = financeService.findOrCreateAccountByNumber(orgId, "1020", "Undeposited Funds – Zeffy", "asset");
 
         List<ZeffyImportRow> rows = rowRepo.findByBatchIdOrderByRowNumber(batchId);
         int committed = 0;

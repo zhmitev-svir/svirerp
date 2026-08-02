@@ -15,14 +15,22 @@ export const financeRoutes: Routes = [
           ),
       },
       {
-        path: 'projects',
+        path: 'master',
         loadComponent: () =>
-          import('./pages/fund-list/fund-list.component').then(m => m.FundListComponent),
-      },
-      {
-        path: 'categories',
-        loadComponent: () =>
-          import('./pages/account-list/account-list.component').then(m => m.AccountListComponent),
+          import('./pages/master-shell/master-shell.component').then(m => m.MasterShellComponent),
+        children: [
+          { path: '', redirectTo: 'projects', pathMatch: 'full' },
+          {
+            path: 'projects',
+            loadComponent: () =>
+              import('./pages/fund-list/fund-list.component').then(m => m.FundListComponent),
+          },
+          {
+            path: 'categories',
+            loadComponent: () =>
+              import('./pages/account-list/account-list.component').then(m => m.AccountListComponent),
+          },
+        ],
       },
       {
         path: 'vendors',
@@ -44,18 +52,55 @@ export const financeRoutes: Routes = [
           ),
       },
       {
-        path: 'stripe-mappings',
+        path: 'stripe',
         loadComponent: () =>
-          import('./pages/stripe-mapping-list/stripe-mapping-list.component').then(
-            m => m.StripeMappingListComponent,
-          ),
+          import('./pages/stripe-shell/stripe-shell.component').then(m => m.StripeShellComponent),
+        children: [
+          { path: '', redirectTo: 'payments', pathMatch: 'full' },
+          {
+            path: 'payments',
+            loadComponent: () =>
+              import('./pages/stripe-events-list/stripe-events-list.component').then(
+                m => m.StripeEventsListComponent,
+              ),
+          },
+          {
+            path: 'mappings',
+            loadComponent: () =>
+              import('./pages/stripe-mapping-list/stripe-mapping-list.component').then(
+                m => m.StripeMappingListComponent,
+              ),
+          },
+        ],
       },
       {
-        path: 'stripe-payments',
+        path: 'reports',
         loadComponent: () =>
-          import('./pages/stripe-events-list/stripe-events-list.component').then(
-            m => m.StripeEventsListComponent,
-          ),
+          import('./pages/reports-shell/reports-shell.component').then(m => m.ReportsShellComponent),
+        children: [
+          { path: '', redirectTo: 'activities', pathMatch: 'full' },
+          {
+            path: 'activities',
+            loadComponent: () =>
+              import('./pages/statement-of-activities/statement-of-activities.component').then(
+                m => m.StatementOfActivitiesComponent,
+              ),
+          },
+          {
+            path: 'financial-position',
+            loadComponent: () =>
+              import(
+                './pages/statement-of-financial-position/statement-of-financial-position.component'
+              ).then(m => m.StatementOfFinancialPositionComponent),
+          },
+          {
+            path: 'funds-overview',
+            loadComponent: () =>
+              import('./pages/funds-overview/funds-overview.component').then(
+                m => m.FundsOverviewComponent,
+              ),
+          },
+        ],
       },
     ],
   },

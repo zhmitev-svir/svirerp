@@ -2,11 +2,12 @@ import { Injectable, inject } from '@angular/core';
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { ENVIRONMENT } from '../../../core/tokens/environment.token';
-import { JournalEntry, JournalLine, RecordExpenseRequest, RecordIncomeRequest } from '../../../core/models/domain.model';
+import { JournalEntry, JournalLine, RecordExpenseRequest, RecordIncomeRequest, RecordTransferRequest } from '../../../core/models/domain.model';
 import { Page, PageParams, DEFAULT_PAGE_PARAMS } from '../../../core/models/api.model';
 
 export interface TransactionFilter {
   fundId?: string;
+  paymentMethod?: string;
   entryDateFrom?: string;
   entryDateTo?: string;
 }
@@ -33,6 +34,9 @@ export class FinanceTransactionService {
     if (filter.fundId) {
       p = p.set('fundId', filter.fundId);
     }
+    if (filter.paymentMethod) {
+      p = p.set('paymentMethod', filter.paymentMethod);
+    }
     if (filter.entryDateFrom) {
       p = p.set('entryDateFrom', filter.entryDateFrom);
     }
@@ -55,6 +59,13 @@ export class FinanceTransactionService {
   recordExpense(orgId: string, request: RecordExpenseRequest): Observable<JournalEntry> {
     return this.http.post<JournalEntry>(
       `${this.env.apiUrl}/organizations/${orgId}/expense-transactions`,
+      request,
+    );
+  }
+
+  recordTransfer(orgId: string, request: RecordTransferRequest): Observable<JournalEntry> {
+    return this.http.post<JournalEntry>(
+      `${this.env.apiUrl}/organizations/${orgId}/transfer-transactions`,
       request,
     );
   }

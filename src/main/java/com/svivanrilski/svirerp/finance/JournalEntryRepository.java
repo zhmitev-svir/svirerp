@@ -31,18 +31,18 @@ public interface JournalEntryRepository extends JpaRepository<JournalEntry, UUID
             "serviceRequest.requestorPerson", "categoryAccount", "categoryAccount.parentAccount", "fund"})
     Page<JournalEntry> findByOrgIdAndStatus(UUID orgId, String status, Pageable pageable);
 
+    /** Backs the transaction list's filter bar (fund / payment method / date range), each filter
+     *  optional — a single flexible query instead of a combinatorial method per filter combination,
+     *  so adding a future filter doesn't double the method count again. */
     @EntityGraph(attributePaths = {"org", "createdBy", "approvedBy", "payer", "vendor", "serviceRequest",
             "serviceRequest.requestorPerson", "categoryAccount", "categoryAccount.parentAccount", "fund"})
-    Page<JournalEntry> findByOrgIdAndEntryDateBetween(UUID orgId, LocalDate from, LocalDate to, Pageable pageable);
-
-    @EntityGraph(attributePaths = {"org", "createdBy", "approvedBy", "payer", "vendor", "serviceRequest",
-            "serviceRequest.requestorPerson", "categoryAccount", "categoryAccount.parentAccount", "fund"})
-    Page<JournalEntry> findByOrgIdAndFundId(UUID orgId, UUID fundId, Pageable pageable);
-
-    @EntityGraph(attributePaths = {"org", "createdBy", "approvedBy", "payer", "vendor", "serviceRequest",
-            "serviceRequest.requestorPerson", "categoryAccount", "categoryAccount.parentAccount", "fund"})
-    Page<JournalEntry> findByOrgIdAndFundIdAndEntryDateBetween(UUID orgId, UUID fundId, LocalDate from, LocalDate to,
-            Pageable pageable);
+    @Query("SELECT e FROM JournalEntry e WHERE e.org.id = :orgId "
+            + "AND (:fundId IS NULL OR e.fund.id = :fundId) "
+            + "AND (:paymentMethod IS NULL OR e.paymentMethod = :paymentMethod) "
+            + "AND (:entryDateFrom IS NULL OR e.entryDate >= :entryDateFrom) "
+            + "AND (:entryDateTo IS NULL OR e.entryDate <= :entryDateTo)")
+    Page<JournalEntry> findByOrgIdAndFilters(UUID orgId, UUID fundId, String paymentMethod,
+            LocalDate entryDateFrom, LocalDate entryDateTo, Pageable pageable);
 
     /** Payment history for a service request — used to compute the balance still owed. */
     @EntityGraph(attributePaths = {"org", "payer", "categoryAccount", "fund"})

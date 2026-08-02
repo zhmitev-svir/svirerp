@@ -271,6 +271,58 @@ export interface FundSummary {
   balance: number;
 }
 
+/** One category row on the Statement of Activities / balance on the Statement of Financial
+ *  Position — amounts/balances are always positive dollar figures, already sign-adjusted server-side. */
+export interface StatementOfActivitiesLine {
+  accountId: string;
+  accountNumber: string;
+  accountName: string;
+  amount: number;
+}
+
+export interface StatementOfActivities {
+  from: string;
+  to: string;
+  income: StatementOfActivitiesLine[];
+  totalIncome: number;
+  expense: StatementOfActivitiesLine[];
+  totalExpense: number;
+  netChange: number;
+}
+
+export interface BalanceSheetLine {
+  accountId: string;
+  accountNumber: string;
+  accountName: string;
+  balance: number;
+}
+
+/** netIncomeToDate is computed server-side (not stored) — see FinanceService#statementOfFinancialPosition;
+ *  this app has no period-closing process, so a real equity account alone wouldn't reflect income
+ *  earned so far. totalAssets always equals totalLiabilitiesAndEquity by the double-entry identity. */
+export interface StatementOfFinancialPosition {
+  asOf: string;
+  assets: BalanceSheetLine[];
+  totalAssets: number;
+  liabilities: BalanceSheetLine[];
+  totalLiabilities: number;
+  equity: BalanceSheetLine[];
+  netIncomeToDate: number;
+  totalEquity: number;
+  totalLiabilitiesAndEquity: number;
+}
+
+/** One fund's financial status, for the all-funds-at-once Funds Overview report. */
+export interface FundOverviewRow {
+  fundId: string;
+  fundName: string;
+  fundType: string;
+  openingBalance: number;
+  totalIncome: number;
+  totalExpense: number;
+  balance: number;
+}
+
 export interface Account {
   id: string;
   org: Organization;
@@ -331,7 +383,7 @@ export interface JournalEntry {
   totalCredit: number;
   // Transaction tags set by the Record Income / Record Expense flow — see RecordIncomeRequest /
   // RecordExpenseRequest. Denormalized for the transaction list; the ledger truth is the lines below.
-  paymentMethod?: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other' | 'stripe';
+  paymentMethod?: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other' | 'stripe' | 'zelle' | 'facebook';
   checkNumber?: string;
   payer?: Person;
   vendor?: Vendor;
@@ -351,7 +403,7 @@ export interface RecordIncomeRequest {
   fundId?: string;
   payerId?: string;
   serviceRequestId?: string;
-  paymentMethod: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other' | 'stripe';
+  paymentMethod: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other' | 'stripe' | 'zelle' | 'facebook';
   checkNumber?: string;
   /** A processing fee deducted before deposit (e.g. Stripe) — splits the entry into a net deposit
    *  line plus a fee-expense line, both still summing to `amount`. Omit for sources with no fee. */
@@ -367,8 +419,19 @@ export interface RecordExpenseRequest {
   paymentAccountId: string;
   fundId?: string;
   vendorId?: string;
-  paymentMethod: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other' | 'stripe';
+  paymentMethod: 'cash' | 'check' | 'zeffy' | 'bank_transfer' | 'card' | 'other' | 'stripe' | 'zelle' | 'facebook';
   checkNumber?: string;
+}
+
+/** "Record Platform Payout" — a transfer from a pass-through platform's "Undeposited Funds"
+ *  clearing account into Checking once its lump-sum payout actually lands. No category/revenue
+ *  account involved; see FinanceService#recordTransfer. */
+export interface RecordTransferRequest {
+  entryDate: string;
+  amount: number;
+  description?: string;
+  fromAccountId: string;
+  toAccountId: string;
 }
 
 export interface JournalLine {

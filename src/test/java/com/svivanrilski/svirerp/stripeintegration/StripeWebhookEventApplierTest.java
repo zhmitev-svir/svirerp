@@ -148,7 +148,8 @@ class StripeWebhookEventApplierTest {
         depositAccount.setId(UUID.randomUUID());
         Account categoryAccount = new Account();
         categoryAccount.setId(UUID.randomUUID());
-        when(financeService.findAccountByNumber(orgId, "1010")).thenReturn(depositAccount);
+        when(financeService.findOrCreateAccountByNumber(orgId, "1021", "Undeposited Funds – Stripe", "asset"))
+                .thenReturn(depositAccount);
         when(financeService.findAccountByNumber(orgId, "4000")).thenReturn(categoryAccount);
 
         JournalEntry entry = new JournalEntry();
@@ -204,7 +205,8 @@ class StripeWebhookEventApplierTest {
         categoryAccount.setId(UUID.randomUUID());
         Account feeAccount = new Account();
         feeAccount.setId(UUID.randomUUID());
-        when(financeService.findAccountByNumber(orgId, "1010")).thenReturn(depositAccount);
+        when(financeService.findOrCreateAccountByNumber(orgId, "1021", "Undeposited Funds – Stripe", "asset"))
+                .thenReturn(depositAccount);
         when(financeService.findAccountByNumber(orgId, "4090")).thenReturn(categoryAccount);
         when(financeService.findOrCreateAccountByNumber(orgId, "5320", "Payment Processing Fees", "expense"))
                 .thenReturn(feeAccount);
@@ -240,7 +242,8 @@ class StripeWebhookEventApplierTest {
         depositAccount.setId(UUID.randomUUID());
         Account categoryAccount = new Account();
         categoryAccount.setId(UUID.randomUUID());
-        when(financeService.findAccountByNumber(orgId, "1010")).thenReturn(depositAccount);
+        when(financeService.findOrCreateAccountByNumber(orgId, "1021", "Undeposited Funds – Stripe", "asset"))
+                .thenReturn(depositAccount);
         when(financeService.findAccountByNumber(orgId, "4090")).thenReturn(categoryAccount);
 
         JournalEntry entry = new JournalEntry();
@@ -249,7 +252,11 @@ class StripeWebhookEventApplierTest {
 
         applier.applyEvent(event.getId());
 
-        verify(financeService, never()).findOrCreateAccountByNumber(any(), any(), any(), any());
+        // The deposit account resolution itself now goes through findOrCreateAccountByNumber (see
+        // resolveDepositAccount) — assert the fee account specifically is never resolved, not that
+        // the method is never called at all.
+        verify(financeService, never())
+                .findOrCreateAccountByNumber(any(), eq("5320"), any(), any());
         ArgumentCaptor<RecordIncomeRequest> reqCaptor = ArgumentCaptor.forClass(RecordIncomeRequest.class);
         verify(financeService).recordIncome(reqCaptor.capture());
         assertThat(reqCaptor.getValue().feeAmount()).isNull();
@@ -279,7 +286,8 @@ class StripeWebhookEventApplierTest {
         depositAccount.setId(UUID.randomUUID());
         Account categoryAccount = new Account();
         categoryAccount.setId(UUID.randomUUID());
-        when(financeService.findAccountByNumber(orgId, "1010")).thenReturn(depositAccount);
+        when(financeService.findOrCreateAccountByNumber(orgId, "1021", "Undeposited Funds – Stripe", "asset"))
+                .thenReturn(depositAccount);
         when(financeService.findAccountByNumber(orgId, "4030")).thenReturn(categoryAccount);
 
         JournalEntry entry = new JournalEntry();

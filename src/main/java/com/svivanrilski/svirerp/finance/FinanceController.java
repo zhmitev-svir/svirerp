@@ -96,19 +96,11 @@ public class FinanceController {
     @GetMapping("/api/organizations/{orgId}/journal-entries")
     public Page<JournalEntry> listEntries(@PathVariable UUID orgId,
             @RequestParam(required = false) UUID fundId,
+            @RequestParam(required = false) String paymentMethod,
             @RequestParam(required = false) LocalDate entryDateFrom,
             @RequestParam(required = false) LocalDate entryDateTo,
             Pageable pageable) {
-        if (fundId != null && entryDateFrom != null && entryDateTo != null) {
-            return service.findEntriesByOrgAndFundAndDateRange(orgId, fundId, entryDateFrom, entryDateTo, pageable);
-        }
-        if (fundId != null) {
-            return service.findEntriesByOrgAndFund(orgId, fundId, pageable);
-        }
-        if (entryDateFrom != null && entryDateTo != null) {
-            return service.findEntriesByOrgAndDateRange(orgId, entryDateFrom, entryDateTo, pageable);
-        }
-        return service.findEntriesByOrg(orgId, pageable);
+        return service.findEntriesByOrg(orgId, fundId, paymentMethod, entryDateFrom, entryDateTo, pageable);
     }
 
     @GetMapping("/api/journal-entries/{id}")
@@ -384,5 +376,36 @@ public class FinanceController {
                 body.description(), body.categoryAccountId(), body.paymentAccountId(), body.fundId(),
                 body.vendorId(), body.paymentMethod(), body.checkNumber());
         return ResponseEntity.status(HttpStatus.CREATED).body(service.recordExpense(req));
+    }
+
+    /** Records a pass-through platform's payout landing in the real bank account — a transfer from
+     *  its "Undeposited Funds" clearing account into Checking, no revenue account touched. */
+    @PostMapping("/api/organizations/{orgId}/transfer-transactions")
+    public ResponseEntity<JournalEntry> recordTransfer(@PathVariable UUID orgId,
+            @RequestBody RecordTransferRequest body) {
+        RecordTransferRequest req = new RecordTransferRequest(orgId, body.entryDate(), body.amount(),
+                body.description(), body.fromAccountId(), body.toAccountId());
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.recordTransfer(req));
+    }
+
+    // ── Reports ──────────────────────────────────────────────────────────────
+
+    @GetMapping("/api/organizations/{orgId}/reports/statement-of-activities")
+    public StatementOfActivities statementOfActivities(@PathVariable UUID orgId,
+            @RequestParam LocalDate entryDateFrom,
+            @RequestParam LocalDate entryDateTo,
+            @RequestParam(required = false) UUID fundId) {
+        return service.statementOfActivities(orgId, entryDateFrom, entryDateTo, fundId);
+    }
+
+    @GetMapping("/api/organizations/{orgId}/reports/statement-of-financial-position")
+    public StatementOfFinancialPosition statementOfFinancialPosition(@PathVariable UUID orgId,
+            @RequestParam LocalDate asOf) {
+        return service.statementOfFinancialPosition(orgId, asOf);
+    }
+
+    @GetMapping("/api/organizations/{orgId}/reports/funds-overview")
+    public List<FundOverviewRow> fundsOverview(@PathVariable UUID orgId) {
+        return service.fundsOverview(orgId);
     }
 }

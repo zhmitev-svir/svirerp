@@ -17,8 +17,10 @@ import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 @Service
 @Transactional(readOnly = true)
@@ -43,7 +45,7 @@ public class FinanceService {
     private static final Set<String> BUDGET_PERIODS =
             Set.of("annual", "q1", "q2", "q3", "q4", "monthly");
     private static final Set<String> PAYMENT_METHODS =
-            Set.of("cash", "check", "zeffy", "bank_transfer", "card", "other", "stripe");
+            Set.of("cash", "check", "zeffy", "bank_transfer", "card", "other", "stripe", "zelle", "facebook");
     private static final Set<String> SERVICE_TYPES =
             Set.of("wedding", "baptism", "funeral", "memorial", "blessing", "other");
     private static final Set<String> SERVICE_REQUEST_STATUSES =
@@ -53,6 +55,13 @@ public class FinanceService {
     private static final String[][] DEFAULT_ACCOUNTS = {
         {"1000", "Cash on Hand", "asset"},
         {"1010", "Checking Account", "asset"},
+        // Pass-through payment platforms hold donations and pay out to Checking in periodic lump
+        // sums, net of their own fees — these clearing accounts let a platform's transactions post
+        // the moment they happen without overstating Checking until the real payout lands. See
+        // StripeWebhookEventApplier#resolveDepositAccount / ZeffyImportService#commitImport.
+        {"1020", "Undeposited Funds – Zeffy", "asset"},
+        {"1021", "Undeposited Funds – Stripe", "asset"},
+        {"1022", "Undeposited Funds – Facebook", "asset"},
         {"3000", "Net Assets", "equity"},
         {"4000", "Membership Dues Income", "revenue"},
         {"4010", "Donation Income", "revenue"},
@@ -248,22 +257,9 @@ public class FinanceService {
 
     // ── JournalEntry ──────────────────────────────────────────────────────────
 
-    public Page<JournalEntry> findEntriesByOrg(UUID orgId, Pageable pageable) {
-        return journalEntryRepo.findByOrgId(orgId, pageable);
-    }
-
-    public Page<JournalEntry> findEntriesByOrgAndFund(UUID orgId, UUID fundId, Pageable pageable) {
-        return journalEntryRepo.findByOrgIdAndFundId(orgId, fundId, pageable);
-    }
-
-    public Page<JournalEntry> findEntriesByOrgAndDateRange(UUID orgId, LocalDate from, LocalDate to,
-            Pageable pageable) {
-        return journalEntryRepo.findByOrgIdAndEntryDateBetween(orgId, from, to, pageable);
-    }
-
-    public Page<JournalEntry> findEntriesByOrgAndFundAndDateRange(UUID orgId, UUID fundId, LocalDate from,
+    public Page<JournalEntry> findEntriesByOrg(UUID orgId, UUID fundId, String paymentMethod, LocalDate from,
             LocalDate to, Pageable pageable) {
-        return journalEntryRepo.findByOrgIdAndFundIdAndEntryDateBetween(orgId, fundId, from, to, pageable);
+        return journalEntryRepo.findByOrgIdAndFilters(orgId, fundId, paymentMethod, from, to, pageable);
     }
 
     public JournalEntry findEntryById(UUID id) {
@@ -801,6 +797,42 @@ public class FinanceService {
         return postEntry(entry.getId(), null);
     }
 
+    /**
+     * Records a platform payout landing in the real bank account: money moves from a pass-through
+     * platform's "Undeposited Funds" clearing account (see DEFAULT_ACCOUNTS) into Checking. No
+     * revenue account is touched — the income was already recognized when the original donation was
+     * recorded against the clearing account, so this is purely a transfer between two asset accounts.
+     */
+    @Transactional
+    public JournalEntry recordTransfer(RecordTransferRequest req) {
+        Organization org = orgService.findById(req.orgId());
+        Account from = findAccountById(req.fromAccountId());
+        requireAccountType(from, "asset", "Source account");
+        Account to = findAccountById(req.toAccountId());
+        requireAccountType(to, "asset", "Destination account");
+
+        JournalEntry entry = journalEntryRepo.save(JournalEntry.builder()
+                .org(org)
+                .entryDate(req.entryDate())
+                .description(req.description())
+                .entryType("general")
+                .status("draft")
+                .totalDebit(req.amount())
+                .totalCredit(req.amount())
+                .build());
+
+        journalLineRepo.save(JournalLine.builder()
+                .journalEntry(entry).account(to)
+                .debitAmount(req.amount()).creditAmount(BigDecimal.ZERO)
+                .memo(req.description()).build());
+        journalLineRepo.save(JournalLine.builder()
+                .journalEntry(entry).account(from)
+                .debitAmount(BigDecimal.ZERO).creditAmount(req.amount())
+                .memo(req.description()).build());
+
+        return postEntry(entry.getId(), null);
+    }
+
     private void requireAccountType(Account account, String expectedType, String label) {
         if (!expectedType.equals(account.getAccountType())) {
             throw new IllegalArgumentException(label + " must be a '" + expectedType
@@ -821,6 +853,100 @@ public class FinanceService {
         BigDecimal totalExpense = journalLineRepo.netAmountForFundAndAccountType(fundId, "expense");
         BigDecimal balance = fund.getOpeningBalance().add(totalIncome).subtract(totalExpense);
         return new FundSummary(fund.getOpeningBalance(), totalIncome, totalExpense, balance);
+    }
+
+    // ── Reports ──────────────────────────────────────────────────────────────
+
+    private StatementOfActivitiesLine toIncomeLine(AccountAmount a) {
+        // revenue is credit-normal — its stored debit-minus-credit is negative for a real donation,
+        // so negate it to get a positive income dollar figure for display.
+        return new StatementOfActivitiesLine(a.getAccountId(), a.getAccountNumber(), a.getAccountName(),
+                a.getAmount().negate());
+    }
+
+    private StatementOfActivitiesLine toExpenseLine(AccountAmount a) {
+        // expense is debit-normal — its stored debit-minus-credit is already a positive dollar figure.
+        return new StatementOfActivitiesLine(a.getAccountId(), a.getAccountNumber(), a.getAccountName(),
+                a.getAmount());
+    }
+
+    /** Income vs. expense by category for a period — see StatementOfActivities. */
+    public StatementOfActivities statementOfActivities(UUID orgId, LocalDate from, LocalDate to, UUID fundId) {
+        List<StatementOfActivitiesLine> income = journalLineRepo
+                .sumByAccountForOrgAndTypeAndDateRange(orgId, "revenue", from, to, fundId)
+                .stream().map(this::toIncomeLine).toList();
+        List<StatementOfActivitiesLine> expense = journalLineRepo
+                .sumByAccountForOrgAndTypeAndDateRange(orgId, "expense", from, to, fundId)
+                .stream().map(this::toExpenseLine).toList();
+
+        BigDecimal totalIncome = income.stream().map(StatementOfActivitiesLine::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalExpense = expense.stream().map(StatementOfActivitiesLine::amount)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new StatementOfActivities(from, to, income, totalIncome, expense, totalExpense,
+                totalIncome.subtract(totalExpense));
+    }
+
+    /** Every account's balance as of a date, grouped Assets/Liabilities/Equity — see
+     *  StatementOfFinancialPosition for the computed "Net Income (to date)" equity line. */
+    public StatementOfFinancialPosition statementOfFinancialPosition(UUID orgId, LocalDate asOf) {
+        List<BalanceSheetLine> assets = journalLineRepo
+                .sumByAccountForOrgAndTypeAsOfDate(orgId, "asset", asOf)
+                .stream().map(a -> new BalanceSheetLine(a.getAccountId(), a.getAccountNumber(),
+                        a.getAccountName(), a.getAmount()))
+                .toList();
+        List<BalanceSheetLine> liabilities = journalLineRepo
+                .sumByAccountForOrgAndTypeAsOfDate(orgId, "liability", asOf)
+                .stream().map(a -> new BalanceSheetLine(a.getAccountId(), a.getAccountNumber(),
+                        a.getAccountName(), a.getAmount().negate()))
+                .toList();
+        List<BalanceSheetLine> equity = journalLineRepo
+                .sumByAccountForOrgAndTypeAsOfDate(orgId, "equity", asOf)
+                .stream().map(a -> new BalanceSheetLine(a.getAccountId(), a.getAccountNumber(),
+                        a.getAccountName(), a.getAmount().negate()))
+                .toList();
+
+        BigDecimal totalAssets = assets.stream().map(BalanceSheetLine::balance)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal totalLiabilities = liabilities.stream().map(BalanceSheetLine::balance)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal equityAccountsTotal = equity.stream().map(BalanceSheetLine::balance)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        // This app has no period-closing process that zeroes revenue/expense into equity, so a
+        // real accounting equity account alone won't reflect income earned so far — compute it live
+        // (never stored) so Assets == Liabilities + Equity still holds by the double-entry identity.
+        BigDecimal revenueToDate = journalLineRepo.sumByAccountForOrgAndTypeAsOfDate(orgId, "revenue", asOf)
+                .stream().map(a -> a.getAmount().negate()).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal expenseToDate = journalLineRepo.sumByAccountForOrgAndTypeAsOfDate(orgId, "expense", asOf)
+                .stream().map(AccountAmount::getAmount).reduce(BigDecimal.ZERO, BigDecimal::add);
+        BigDecimal netIncomeToDate = revenueToDate.subtract(expenseToDate);
+
+        BigDecimal totalEquity = equityAccountsTotal.add(netIncomeToDate);
+        BigDecimal totalLiabilitiesAndEquity = totalLiabilities.add(totalEquity);
+
+        return new StatementOfFinancialPosition(asOf, assets, totalAssets, liabilities, totalLiabilities,
+                equity, netIncomeToDate, totalEquity, totalLiabilitiesAndEquity);
+    }
+
+    /** Every active fund's opening balance/income/expense/balance in one batch — same math as
+     *  fundSummary(), without an N+1 per-fund call. */
+    public List<FundOverviewRow> fundsOverview(UUID orgId) {
+        List<Fund> funds = fundRepo.findByOrgIdAndIsActiveOrderByFundName(orgId, true);
+
+        Map<UUID, BigDecimal> incomeByFund = journalLineRepo.sumByFundAndAccountType(orgId, "revenue")
+                .stream().collect(Collectors.toMap(FundAmount::getFundId, a -> a.getAmount().negate()));
+        Map<UUID, BigDecimal> expenseByFund = journalLineRepo.sumByFundAndAccountType(orgId, "expense")
+                .stream().collect(Collectors.toMap(FundAmount::getFundId, FundAmount::getAmount));
+
+        return funds.stream().map(fund -> {
+            BigDecimal income = incomeByFund.getOrDefault(fund.getId(), BigDecimal.ZERO);
+            BigDecimal expense = expenseByFund.getOrDefault(fund.getId(), BigDecimal.ZERO);
+            BigDecimal balance = fund.getOpeningBalance().add(income).subtract(expense);
+            return new FundOverviewRow(fund.getId(), fund.getFundName(), fund.getFundType(),
+                    fund.getOpeningBalance(), income, expense, balance);
+        }).toList();
     }
 
     // ── Internal validators ───────────────────────────────────────────────────

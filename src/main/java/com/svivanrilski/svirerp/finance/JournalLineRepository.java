@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -49,4 +50,37 @@ public interface JournalLineRepository extends JpaRepository<JournalLine, UUID> 
            "FROM JournalLine l WHERE l.fund.id = :fundId AND l.account.accountType = :accountType " +
            "AND l.journalEntry.status = 'posted'")
     BigDecimal netAmountForFundAndAccountType(UUID fundId, String accountType);
+
+    /** Per-account debit-minus-credit for one org/accountType, restricted to entries dated within
+     *  [from, to] and (optionally) one fund — powers the Statement of Activities report. */
+    @Query("SELECT l.account.id AS accountId, l.account.accountNumber AS accountNumber, "
+            + "l.account.accountName AS accountName, "
+            + "COALESCE(SUM(l.debitAmount), 0) - COALESCE(SUM(l.creditAmount), 0) AS amount "
+            + "FROM JournalLine l WHERE l.account.org.id = :orgId AND l.account.accountType = :accountType "
+            + "AND l.journalEntry.status = 'posted' AND l.journalEntry.entryDate BETWEEN :from AND :to "
+            + "AND (:fundId IS NULL OR l.fund.id = :fundId) "
+            + "GROUP BY l.account.id, l.account.accountNumber, l.account.accountName "
+            + "ORDER BY l.account.accountNumber")
+    List<AccountAmount> sumByAccountForOrgAndTypeAndDateRange(UUID orgId, String accountType,
+            LocalDate from, LocalDate to, UUID fundId);
+
+    /** Per-account debit-minus-credit for one org/accountType, cumulative through :asOf — powers the
+     *  Statement of Financial Position report (a snapshot, not a period range). */
+    @Query("SELECT l.account.id AS accountId, l.account.accountNumber AS accountNumber, "
+            + "l.account.accountName AS accountName, "
+            + "COALESCE(SUM(l.debitAmount), 0) - COALESCE(SUM(l.creditAmount), 0) AS amount "
+            + "FROM JournalLine l WHERE l.account.org.id = :orgId AND l.account.accountType = :accountType "
+            + "AND l.journalEntry.status = 'posted' AND l.journalEntry.entryDate <= :asOf "
+            + "GROUP BY l.account.id, l.account.accountNumber, l.account.accountName "
+            + "ORDER BY l.account.accountNumber")
+    List<AccountAmount> sumByAccountForOrgAndTypeAsOfDate(UUID orgId, String accountType, LocalDate asOf);
+
+    /** Per-fund debit-minus-credit for one org/accountType, all-time — powers Funds Overview without
+     *  an N+1 per-fund call. */
+    @Query("SELECT l.fund.id AS fundId, "
+            + "COALESCE(SUM(l.debitAmount), 0) - COALESCE(SUM(l.creditAmount), 0) AS amount "
+            + "FROM JournalLine l WHERE l.fund.org.id = :orgId AND l.account.accountType = :accountType "
+            + "AND l.journalEntry.status = 'posted' AND l.fund IS NOT NULL "
+            + "GROUP BY l.fund.id")
+    List<FundAmount> sumByFundAndAccountType(UUID orgId, String accountType);
 }

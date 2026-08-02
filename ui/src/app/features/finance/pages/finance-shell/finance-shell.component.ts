@@ -13,13 +13,9 @@ import { MatTabsModule } from '@angular/material/tabs';
          [active]="transactionsActive.isActive">
         Transactions
       </a>
-      <a mat-tab-link routerLink="projects" routerLinkActive #projectsActive="routerLinkActive"
-         [active]="projectsActive.isActive">
-        Projects &amp; Funds
-      </a>
-      <a mat-tab-link routerLink="categories" routerLinkActive #categoriesActive="routerLinkActive"
-         [active]="categoriesActive.isActive">
-        Categories
+      <a mat-tab-link routerLink="master" routerLinkActive #masterActive="routerLinkActive"
+         [active]="masterActive.isActive">
+        Master
       </a>
       <a mat-tab-link routerLink="vendors" routerLinkActive #vendorsActive="routerLinkActive"
          [active]="vendorsActive.isActive">
@@ -33,13 +29,13 @@ import { MatTabsModule } from '@angular/material/tabs';
          [active]="zeffyImportActive.isActive">
         Zeffy Import
       </a>
-      <a mat-tab-link routerLink="stripe-mappings" routerLinkActive #stripeMappingsActive="routerLinkActive"
-         [active]="stripeMappingsActive.isActive">
-        Stripe Mappings
+      <a mat-tab-link routerLink="stripe" routerLinkActive #stripeActive="routerLinkActive"
+         [active]="stripeActive.isActive">
+        Stripe
       </a>
-      <a mat-tab-link routerLink="stripe-payments" routerLinkActive #stripePaymentsActive="routerLinkActive"
-         [active]="stripePaymentsActive.isActive">
-        Stripe Payments
+      <a mat-tab-link routerLink="reports" routerLinkActive #reportsActive="routerLinkActive"
+         [active]="reportsActive.isActive">
+        Reports
       </a>
     </nav>
     <mat-tab-nav-panel #tabPanel>

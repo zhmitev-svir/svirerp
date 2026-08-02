@@ -17,6 +17,7 @@ import { DataTableComponent, TableColumn, TableAction } from '../../../../shared
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { IncomeFormComponent } from '../income-form/income-form.component';
 import { ExpenseFormComponent } from '../expense-form/expense-form.component';
+import { PayoutFormComponent } from '../payout-form/payout-form.component';
 import { JournalEntryDetailDialogComponent } from '../journal-entry-detail-dialog/journal-entry-detail-dialog.component';
 
 function partyName(entry: JournalEntry): string {
@@ -24,6 +25,18 @@ function partyName(entry: JournalEntry): string {
   if (entry.vendor) return entry.vendor.name;
   return '—';
 }
+
+const PAYMENT_METHOD_OPTIONS: { value: string; label: string }[] = [
+  { value: 'zeffy', label: 'Zeffy' },
+  { value: 'stripe', label: 'Stripe' },
+  { value: 'facebook', label: 'Facebook' },
+  { value: 'cash', label: 'Cash' },
+  { value: 'zelle', label: 'Zelle' },
+  { value: 'check', label: 'Check' },
+  { value: 'bank_transfer', label: 'Bank Transfer' },
+  { value: 'card', label: 'Card' },
+  { value: 'other', label: 'Other' },
+];
 
 @Component({
   selector: 'app-transaction-list',
@@ -43,6 +56,10 @@ function partyName(entry: JournalEntry): string {
             <mat-icon>remove_circle</mat-icon>
             Record Expense
           </button>
+          <button mat-stroked-button (click)="openPayoutForm()">
+            <mat-icon>sync_alt</mat-icon>
+            Record Payout
+          </button>
         </ng-container>
       </app-page-header>
 
@@ -53,6 +70,16 @@ function partyName(entry: JournalEntry): string {
             <mat-option [value]="null">All</mat-option>
             @for (f of funds(); track f.id) {
               <mat-option [value]="f.id">{{ f.fundName }}</mat-option>
+            }
+          </mat-select>
+        </mat-form-field>
+
+        <mat-form-field appearance="outline" class="filter-field">
+          <mat-label>Source / Method</mat-label>
+          <mat-select [(ngModel)]="paymentMethodFilter" (selectionChange)="onFilterChange()">
+            <mat-option [value]="null">All</mat-option>
+            @for (m of paymentMethodOptions; track m.value) {
+              <mat-option [value]="m.value">{{ m.label }}</mat-option>
             }
           </mat-select>
         </mat-form-field>
@@ -87,6 +114,8 @@ export class TransactionListComponent implements OnInit {
   pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
   funds = signal<Fund[]>([]);
   fundFilter: string | null = null;
+  paymentMethodFilter: string | null = null;
+  readonly paymentMethodOptions = PAYMENT_METHOD_OPTIONS;
 
   readonly columns: TableColumn[] = [
     { key: 'entryDate', header: 'Date', sortable: true },
@@ -137,6 +166,17 @@ export class TransactionListComponent implements OnInit {
       .subscribe(saved => { if (saved) this.loadPage(); });
   }
 
+  openPayoutForm(): void {
+    if (!this.orgId) {
+      this.notifications.error('No organization found — create one first, under Organizations.');
+      return;
+    }
+    this.dialog
+      .open(PayoutFormComponent, { width: '480px', data: { orgId: this.orgId } })
+      .afterClosed()
+      .subscribe(saved => { if (saved) this.loadPage(); });
+  }
+
   openDetail(entry: JournalEntry): void {
     this.dialog.open(JournalEntryDetailDialogComponent, { width: '560px', data: { entry } });
   }
@@ -163,7 +203,10 @@ export class TransactionListComponent implements OnInit {
           });
         }
         this.transactionService
-          .getPageForOrg(orgId, this.pageParams(), { fundId: this.fundFilter ?? undefined })
+          .getPageForOrg(orgId, this.pageParams(), {
+            fundId: this.fundFilter ?? undefined,
+            paymentMethod: this.paymentMethodFilter ?? undefined,
+          })
           .subscribe({
             next: data => { this.page.set(data); this.loading.set(false); },
             error: () => this.loading.set(false),

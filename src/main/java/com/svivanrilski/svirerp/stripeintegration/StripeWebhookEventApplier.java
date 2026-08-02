@@ -211,9 +211,14 @@ public class StripeWebhookEventApplier {
         eventRepo.save(row);
     }
 
+    /** Stripe holds funds and pays out to the real bank in periodic lump sums, net of its fee — post
+     *  to the "Undeposited Funds – Stripe" clearing account rather than Checking directly, so Checking
+     *  only grows when the actual payout lands (see FinanceService#recordTransfer / DEFAULT_ACCOUNTS).
+     *  findOrCreateAccountByNumber retrofits this org's already-established chart of accounts the
+     *  same way resolveFeeAccount does for 5320. */
     private Account resolveDepositAccount(UUID orgId) {
         financeService.findAccountsByOrg(orgId, PageRequest.of(0, 1)); // triggers the lazy chart-of-accounts seed
-        return financeService.findAccountByNumber(orgId, "1010");
+        return financeService.findOrCreateAccountByNumber(orgId, "1021", "Undeposited Funds – Stripe", "asset");
     }
 
     /** Falls back to a sensible default revenue account per purpose when the mapping doesn't
