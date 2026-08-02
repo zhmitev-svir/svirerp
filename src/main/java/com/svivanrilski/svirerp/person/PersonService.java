@@ -2,12 +2,16 @@ package com.svivanrilski.svirerp.person;
 
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import com.svivanrilski.svirerp.common.ResourceNotFoundException;
+import com.svivanrilski.svirerp.common.SearchSpecifications;
 
+import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -15,10 +19,27 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PersonService {
 
+    /** Allow-list for the autocomplete search endpoint — never trust a client-supplied field name
+     *  without checking it against this first (see SearchSpecifications). */
+    private static final Set<String> SEARCHABLE_FIELDS = Set.of("firstName", "lastName");
+
     private final PersonRepository repo;
 
     public Page<Person> findAll(Pageable pageable) {
         return repo.findAll(pageable);
+    }
+
+    /** Autocomplete search — case-insensitive "contains" match against one allow-listed field,
+     *  capped to 20 results (a typeahead dropdown, not a paginated list). */
+    public List<Person> search(String field, String query) {
+        if (!SEARCHABLE_FIELDS.contains(field)) {
+            throw new IllegalArgumentException(
+                    "Field '" + field + "' is not searchable on Person. Allowed: " + SEARCHABLE_FIELDS);
+        }
+        if (query == null || query.isBlank()) {
+            return List.of();
+        }
+        return repo.findAll(SearchSpecifications.contains(field, query.trim()), PageRequest.of(0, 20)).getContent();
     }
 
     public Person findById(UUID id) {

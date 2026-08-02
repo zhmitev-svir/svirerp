@@ -20,6 +20,11 @@ import { VolunteerService } from '../../services/volunteer.service';
 import { VolunteerAreaService } from '../../services/volunteer-area.service';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Person, Volunteer, VolunteerArea, Organization } from '../../../../core/models/domain.model';
+import { AutocompleteComponent } from '../../../../shared/components/autocomplete/autocomplete.component';
+
+function personLabel(p: Person): string {
+  return `${p.firstName} ${p.lastName} (${p.email})`;
+}
 
 export interface VolunteerFormData {
   orgId: string;
@@ -42,6 +47,7 @@ export interface VolunteerFormData {
     MatIconModule,
     MatTooltipModule,
     MatProgressSpinnerModule,
+    AutocompleteComponent,
   ],
   template: `
     <h2 mat-dialog-title>{{ isEdit ? 'Edit' : 'Add' }} Volunteer</h2>
@@ -50,17 +56,13 @@ export interface VolunteerFormData {
       <form [formGroup]="form" class="volunteer-form">
 
         <div class="form-row">
-          <mat-form-field appearance="outline" class="flex-1">
-            <mat-label>Volunteer</mat-label>
-            <mat-select formControlName="personId">
-              @for (p of persons(); track p.id) {
-                <mat-option [value]="p.id">{{ p.firstName }} {{ p.lastName }}</mat-option>
-              }
-            </mat-select>
-            @if (form.controls.personId.invalid && form.controls.personId.touched) {
-              <mat-error>Select a person</mat-error>
-            }
-          </mat-form-field>
+          <app-autocomplete class="flex-1"
+              formControlName="personId"
+              label="Volunteer"
+              errorText="Select a person"
+              [searchFn]="searchByFirstName"
+              [displayFn]="personLabel"
+              [initialLabel]="volunteerLabel()" />
           <button mat-icon-button type="button" matTooltip="Add new person"
                   (click)="addPerson('volunteer')">
             <mat-icon>person_add</mat-icon>
@@ -173,6 +175,10 @@ export class VolunteerFormComponent implements OnInit {
 
   persons = signal<Person[]>([]);
   areas = signal<VolunteerArea[]>([]);
+  volunteerLabel = signal('');
+
+  personLabel = personLabel;
+  searchByFirstName = (q: string) => this.personService.search('firstName', q);
 
   form = this.fb.nonNullable.group({
     personId: ['', Validators.required],
@@ -205,6 +211,7 @@ export class VolunteerFormComponent implements OnInit {
         availability: this.entity.availability ?? '',
         notes: this.entity.notes ?? '',
       });
+      this.volunteerLabel.set(personLabel(this.entity.person));
     }
   }
 
@@ -217,6 +224,7 @@ export class VolunteerFormComponent implements OnInit {
         this.persons.update(list => [...list, created]);
         if (target === 'volunteer') {
           this.form.controls.personId.setValue(created.id);
+          this.volunteerLabel.set(personLabel(created));
         } else {
           this.form.controls.contactPersonId.setValue(created.id);
         }

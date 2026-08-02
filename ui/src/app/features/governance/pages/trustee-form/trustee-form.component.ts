@@ -11,13 +11,13 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatIconModule } from '@angular/material/icon';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSelectModule } from '@angular/material/select';
 
 import { TrusteeService } from '../../services/trustee.service';
 import { PersonService } from '../../../persons/services/person.service';
 import { PersonFormComponent } from '../../../persons/pages/person-form/person-form.component';
 import { NotificationService } from '../../../../core/services/notification.service';
 import { Trustee, Person } from '../../../../core/models/domain.model';
+import { AutocompleteComponent } from '../../../../shared/components/autocomplete/autocomplete.component';
 
 interface TrusteeDialogData {
   orgId: string;
@@ -30,6 +30,10 @@ function toIsoDate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+function personLabel(p: Person): string {
+  return `${p.firstName} ${p.lastName} (${p.email})`;
+}
+
 @Component({
   selector: 'app-trustee-form',
   standalone: true,
@@ -39,12 +43,12 @@ function toIsoDate(date: Date): string {
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
-    MatSelectModule,
     MatCheckboxModule,
     MatButtonModule,
     MatIconModule,
     MatTooltipModule,
     MatProgressSpinnerModule,
+    AutocompleteComponent,
   ],
   template: `
     <h2 mat-dialog-title>{{ isEdit ? 'Edit' : 'Add' }} Trustee</h2>
@@ -53,17 +57,13 @@ function toIsoDate(date: Date): string {
       <form [formGroup]="form" class="trustee-form">
 
         <div class="person-row">
-          <mat-form-field appearance="outline" class="full-width">
-            <mat-label>Person</mat-label>
-            <mat-select formControlName="personId">
-              @for (person of persons(); track person.id) {
-                <mat-option [value]="person.id">{{ person.firstName }} {{ person.lastName }} ({{ person.email }})</mat-option>
-              }
-            </mat-select>
-            @if (form.controls.personId.invalid && form.controls.personId.touched) {
-              <mat-error>Person is required</mat-error>
-            }
-          </mat-form-field>
+          <app-autocomplete class="full-width"
+              formControlName="personId"
+              label="Person"
+              errorText="Person is required"
+              [searchFn]="searchByFirstName"
+              [displayFn]="personLabel"
+              [initialLabel]="personDisplayLabel()" />
 
           <button mat-icon-button type="button" matTooltip="Person not in the list? Add a new one"
                   (click)="openNewPersonDialog()">
@@ -146,7 +146,9 @@ export class TrusteeFormComponent implements OnInit {
   isEdit = !!this.trustee;
   saving = signal(false);
 
-  persons = signal<Person[]>([]);
+  personDisplayLabel = signal('');
+  personLabel = personLabel;
+  searchByFirstName = (q: string) => this.personService.search('firstName', q);
 
   form = this.fb.nonNullable.group({
     personId: ['', Validators.required],
@@ -160,12 +162,6 @@ export class TrusteeFormComponent implements OnInit {
   });
 
   ngOnInit(): void {
-    // No search/autocomplete endpoint exists on the backend yet; a plain
-    // dropdown over a reasonably-sized page is fine at this org's scale.
-    this.personService.getPage({ page: 0, size: 200 }).subscribe(page => {
-      this.persons.set(page.content);
-    });
-
     if (this.trustee) {
       this.form.patchValue({
         personId: this.trustee.person.id,
@@ -177,6 +173,7 @@ export class TrusteeFormComponent implements OnInit {
         isActive: this.trustee.isActive,
         isOfficer: this.trustee.isOfficer,
       });
+      this.personDisplayLabel.set(personLabel(this.trustee.person));
     }
   }
 
@@ -186,8 +183,8 @@ export class TrusteeFormComponent implements OnInit {
       .afterClosed()
       .subscribe((person?: Person) => {
         if (person) {
-          this.persons.set([person, ...this.persons()]);
           this.form.patchValue({ personId: person.id });
+          this.personDisplayLabel.set(personLabel(person));
         }
       });
   }

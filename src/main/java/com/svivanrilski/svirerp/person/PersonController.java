@@ -8,6 +8,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -20,6 +21,12 @@ public class PersonController {
     @GetMapping
     public Page<Person> list(Pageable pageable) {
         return service.findAll(pageable);
+    }
+
+    /** Autocomplete search — e.g. GET /api/persons/search?field=firstName&q=Jo. */
+    @GetMapping("/search")
+    public List<Person> search(@RequestParam String field, @RequestParam String q) {
+        return service.search(field, q);
     }
 
     @GetMapping("/{id}")
