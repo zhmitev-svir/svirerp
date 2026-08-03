@@ -8,7 +8,7 @@ export const governanceRoutes: Routes = [
         m => m.GovernanceShellComponent,
       ),
     children: [
-      { path: '', redirectTo: 'trustees', pathMatch: 'full' },
+      { path: '', redirectTo: 'meeting-minutes', pathMatch: 'full' },
       {
         path: 'trustees',
         loadComponent: () =>
