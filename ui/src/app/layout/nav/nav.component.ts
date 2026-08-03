@@ -1,7 +1,8 @@
-import { Component, computed, inject, output, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, inject, input, output, ChangeDetectionStrategy } from '@angular/core';
 import { RouterLink, RouterLinkActive } from '@angular/router';
 import { MatListModule } from '@angular/material/list';
 import { MatIconModule } from '@angular/material/icon';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { AuthService } from '../../core/services/auth.service';
 
 interface NavItem {
@@ -14,16 +15,21 @@ interface NavItem {
   selector: 'app-nav',
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
-  imports: [RouterLink, RouterLinkActive, MatListModule, MatIconModule],
+  imports: [RouterLink, RouterLinkActive, MatListModule, MatIconModule, MatTooltipModule],
   template: `
     <mat-nav-list class="nav-list">
       @for (item of navItems(); track item.route) {
         <a mat-list-item
            [routerLink]="item.route"
            routerLinkActive="nav-active"
+           [matTooltip]="item.label"
+           [matTooltipDisabled]="!collapsed()"
+           matTooltipPosition="right"
            (click)="navigate.emit()">
           <mat-icon matListItemIcon>{{ item.icon }}</mat-icon>
-          <span matListItemTitle>{{ item.label }}</span>
+          @if (!collapsed()) {
+            <span matListItemTitle>{{ item.label }}</span>
+          }
         </a>
       }
     </mat-nav-list>
@@ -38,6 +44,7 @@ export class NavComponent {
   private auth = inject(AuthService);
 
   navigate = output<void>();
+  collapsed = input<boolean>(false);
 
   private readonly baseNavItems: NavItem[] = [
     { label: 'Dashboard',      icon: 'dashboard',           route: '/dashboard' },

@@ -1,4 +1,4 @@
-import { Component, inject, ChangeDetectionStrategy } from '@angular/core';
+import { Component, computed, inject, ChangeDetectionStrategy } from '@angular/core';
 import { Router, RouterOutlet } from '@angular/router';
 import { BreakpointObserver, Breakpoints } from '@angular/cdk/layout';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -12,6 +12,7 @@ import { MatTooltipModule } from '@angular/material/tooltip';
 
 import { NavComponent } from '../nav/nav.component';
 import { AuthService } from '../../core/services/auth.service';
+import { NavCollapseService } from '../../core/services/nav-collapse.service';
 
 @Component({
   selector: 'app-shell',
@@ -27,20 +28,32 @@ import { AuthService } from '../../core/services/auth.service';
     NavComponent,
   ],
   template: `
-    <mat-sidenav-container class="shell-container">
+    <mat-sidenav-container class="shell-container" #container>
 
       <mat-sidenav
         #sidenav
         [mode]="isMobile() ? 'over' : 'side'"
         [opened]="!isMobile()"
-        class="shell-sidenav">
+        class="shell-sidenav"
+        [class.collapsed]="navCollapsed()"
+        (transitionend)="container.updateContentMargins()">
 
         <div class="brand-header">
-          <mat-icon class="brand-icon">church</mat-icon>
-          <span class="brand-name">SvirERP</span>
+          @if (!navCollapsed()) {
+            <mat-icon class="brand-icon">church</mat-icon>
+            <span class="brand-name">SvirERP</span>
+            <span class="brand-header-spacer"></span>
+          }
+          @if (!isMobile()) {
+            <button mat-icon-button (click)="navCollapse.toggle()"
+                    [matTooltip]="navCollapsed() ? 'Expand navigation' : 'Collapse navigation'"
+                    [attr.aria-label]="navCollapsed() ? 'Expand navigation' : 'Collapse navigation'">
+              <mat-icon>{{ navCollapsed() ? 'chevron_right' : 'chevron_left' }}</mat-icon>
+            </button>
+          }
         </div>
 
-        <app-nav (navigate)="isMobile() && sidenav.close()" />
+        <app-nav [collapsed]="navCollapsed()" (navigate)="isMobile() && sidenav.close()" />
       </mat-sidenav>
 
       <mat-sidenav-content class="shell-content">
@@ -67,7 +80,8 @@ import { AuthService } from '../../core/services/auth.service';
   `,
   styles: [`
     .shell-container { height: 100vh; }
-    .shell-sidenav { width: 240px; border-right: 1px solid rgba(0,0,0,.12); }
+    .shell-sidenav { width: 240px; border-right: 1px solid rgba(0,0,0,.12); transition: width .15s ease; }
+    .shell-sidenav.collapsed { width: 64px; }
     .brand-header {
       display: flex;
       align-items: center;
@@ -75,8 +89,10 @@ import { AuthService } from '../../core/services/auth.service';
       padding: 16px;
       border-bottom: 1px solid rgba(0,0,0,.08);
     }
-    .brand-icon { color: #3f51b5; font-size: 28px; }
-    .brand-name { font-size: 20px; font-weight: 500; }
+    .shell-sidenav.collapsed .brand-header { padding: 8px; justify-content: center; }
+    .brand-icon { color: #3f51b5; font-size: 28px; flex-shrink: 0; }
+    .brand-name { font-size: 20px; font-weight: 500; white-space: nowrap; }
+    .brand-header-spacer { flex: 1 1 auto; }
     .shell-toolbar { position: sticky; top: 0; z-index: 10; }
     .toolbar-app-name { margin-left: 8px; font-size: 18px; }
     .toolbar-spacer { flex: 1 1 auto; }
@@ -84,15 +100,25 @@ import { AuthService } from '../../core/services/auth.service';
     .shell-main { padding: 0; min-height: calc(100vh - 64px); }
   `],
 })
+// mat-sidenav-container only recalculates its content's left margin ("push" layout for
+// mode="side") on drawer open/close, mode changes, or viewport resize — not on an arbitrary CSS
+// width change to an already-open drawer like our collapse toggle. Listening for the sidenav's own
+// width `transitionend` and calling `updateContentMargins()` then (see template) is the documented
+// way to force a re-measure once the new width has actually finished rendering.
 export class ShellComponent {
   private breakpoint = inject(BreakpointObserver);
   private router = inject(Router);
   protected auth = inject(AuthService);
+  protected navCollapse = inject(NavCollapseService);
 
   isMobile = toSignal(
     this.breakpoint.observe(Breakpoints.Handset).pipe(map(r => r.matches)),
     { initialValue: false },
   );
+
+  // Icon-only rail only applies in desktop "side" mode — mobile's "over" mode is a temporary
+  // overlay where full labels stay more usable, regardless of the remembered desktop preference.
+  navCollapsed = computed(() => !this.isMobile() && this.navCollapse.collapsed());
 
   logout(): void {
     this.auth.logout().subscribe(() => this.router.navigateByUrl('/login'));
