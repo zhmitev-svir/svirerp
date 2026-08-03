@@ -111,7 +111,8 @@ export class TransactionListComponent implements OnInit {
   private orgId: string | null = null;
   page = signal<Page<JournalEntry> | null>(null);
   loading = signal(false);
-  pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
+  // Latest transactions first by default — treasurers care most about what just happened.
+  pageParams = signal<PageParams>({ ...DEFAULT_PAGE_PARAMS, sort: 'entryDate,desc' });
   funds = signal<Fund[]>([]);
   fundFilter: string | null = null;
   paymentMethodFilter: string | null = null;
