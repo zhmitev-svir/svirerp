@@ -19,7 +19,7 @@ import { PersonFormComponent } from '../person-form/person-form.component';
   template: `
     <div class="page-container">
       <app-page-header
-        title="Persons"
+        title="People"
         subtitle="People and contacts in the system"
         actionLabel="Add Person"
         actionIcon="person_add"
