@@ -48,7 +48,7 @@ export class PersonListComponent implements OnInit {
   readonly columns: TableColumn[] = [
     { key: 'firstName', header: 'First Name' },
     { key: 'lastName',  header: 'Last Name' },
-    { key: 'email',     header: 'Email', sortable: true },
+    { key: 'email',     header: 'Email', sortable: true, type: 'email' },
     { key: 'phone',     header: 'Phone' },
     { key: 'city',      header: 'City' },
   ];
