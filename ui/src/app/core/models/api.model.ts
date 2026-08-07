@@ -80,11 +80,31 @@ export interface ZeffyImportCommitResult {
 export interface ZeffyCampaignMappingRequest {
   campaignTitle: string;
   fundId: string;
+  isMembershipPayment: boolean;
+}
+
+/** Response shape of POST /api/organizations/{orgId}/zeffy-imports/reprocess-membership-rows —
+ *  the one-time backfill for Ticket rows whose campaign was flagged as a membership payment
+ *  after they'd already committed. */
+export interface ReprocessMembershipResult {
+  rowsProcessed: number;
+  membersCreated: number;
 }
 
 /** Response shape of POST /api/organizations/{orgId}/members/recompute-tiers. */
 export interface RecomputeTiersResult {
   membersProcessed: number;
+}
+
+/** Response shape of GET /api/organizations/{orgId}/members/summary. Followers have no
+ *  active/inactive split — they never expire (see TierCalculator on the backend). */
+export interface MemberSummary {
+  activeMembers: number;
+  inactiveMembers: number;
+  activeBenefactors: number;
+  inactiveBenefactors: number;
+  followers: number;
+  totalMembers: number;
 }
 
 /** Request body for POST /api/organizations/{orgId}/stripe-product-mappings and

@@ -509,6 +509,9 @@ export interface ZeffyCampaignMapping {
   org: Organization;
   campaignTitle: string;
   fund: Fund;
+  /** Overrides the Ticket-category-skips-membership default — Zeffy implements fixed-price
+   *  membership registration as a Ticket-type product, not Donation. */
+  isMembershipPayment: boolean;
   createdAt?: string;
 }
 
@@ -522,27 +525,25 @@ export interface ZeffyImportBatch {
   committedAt?: string;
 }
 
-/** One row per line of an uploaded Zeffy CSV — the preview/commit staging area and audit trail. */
+/** One row per line of an uploaded Zeffy Transactions export — the preview/commit staging area
+ *  and audit trail. */
 export interface ZeffyImportRow {
   id: string;
   batch: ZeffyImportBatch;
   org: Organization;
   rowNumber: number;
-  paymentDate?: string;
-  paymentTime?: string;
+  transactionId?: string;
   amount?: number;
-  paymentStatus?: string;
-  payoutDate?: string;
+  /** "Donation" earns membership tier credit; "Ticket" is a plain income posting only. */
+  category?: 'Donation' | 'Ticket';
+  /** The tax-deductible portion — informational only, blank for non-donation rows. */
+  eligibleAmount?: number;
+  transactionDate?: string;
+  /** When Zeffy pays this out to the bank — informational only. */
+  availableDate?: string;
   firstName?: string;
   lastName?: string;
   email?: string;
-  address?: string;
-  city?: string;
-  postalCode?: string;
-  state?: string;
-  country?: string;
-  taxReceiptNumber?: string;
-  taxReceiptUrl?: string;
   campaignTitle?: string;
   dedupeKey?: string;
   outcome: 'pending_preview' | 'ready' | 'duplicate' | 'skipped_status' | 'unmapped_campaign' | 'error' | 'committed';
