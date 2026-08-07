@@ -29,6 +29,9 @@ public class GovernanceService {
     private static final Set<String> RESOLUTION_STATUSES = Set.of("passed", "failed", "tabled", "withdrawn");
     private static final Set<String> ACTION_ITEM_PRIORITIES = Set.of("high", "normal", "low");
     private static final Set<String> ACTION_ITEM_STATUSES = Set.of("new", "planned", "done");
+    private static final Set<String> PROJECT_STATUSES =
+            Set.of("planning", "in_progress", "on_hold", "completed", "cancelled");
+    private static final Set<String> PROJECT_TASK_STATUSES = Set.of("todo", "in_progress", "blocked", "done");
 
     private final TrusteeRepository trusteeRepo;
     private final TrusteeDocumentRepository trusteeDocRepo;
@@ -38,6 +41,10 @@ public class GovernanceService {
     private final CommitteeResolutionRepository resolutionRepo;
     private final MeetingMinutesRepository meetingMinutesRepo;
     private final ActionItemRepository actionItemRepo;
+    private final ProjectRepository projectRepo;
+    private final ProjectTaskRepository projectTaskRepo;
+    private final ProjectCommentRepository projectCommentRepo;
+    private final ProjectTaskCommentRepository projectTaskCommentRepo;
     private final OrganizationService orgService;
     private final PersonService personService;
 
@@ -371,6 +378,135 @@ public class GovernanceService {
         actionItemRepo.deleteById(id);
     }
 
+    // ── Project ──────────────────────────────────────────────────────────────
+
+    public Page<Project> findProjectsByOrg(UUID orgId, String status, Pageable pageable) {
+        if (status != null && !status.isBlank()) {
+            validateProjectStatus(status);
+            return projectRepo.findByOrgIdAndStatus(orgId, status, pageable);
+        }
+        return projectRepo.findByOrgId(orgId, pageable);
+    }
+
+    public Project findProjectById(UUID id) {
+        return projectRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Project", id));
+    }
+
+    @Transactional
+    public Project createProject(Project project) {
+        validateProjectStatus(project.getStatus());
+        Organization org = orgService.findById(project.getOrg().getId());
+        project.setOrg(org);
+        project.setAssignee(resolveAssignee(project.getAssignee()));
+        return projectRepo.save(project);
+    }
+
+    @Transactional
+    public Project updateProject(UUID id, Project patch) {
+        validateProjectStatus(patch.getStatus());
+        Project existing = findProjectById(id);
+        existing.setName(patch.getName());
+        existing.setDescription(patch.getDescription());
+        existing.setStatus(patch.getStatus());
+        existing.setDueDate(patch.getDueDate());
+        existing.setAssignee(resolveAssignee(patch.getAssignee()));
+        return projectRepo.save(existing);
+    }
+
+    @Transactional
+    public void deleteProject(UUID id) {
+        if (!projectRepo.existsById(id)) throw new ResourceNotFoundException("Project", id);
+        projectRepo.deleteById(id);
+    }
+
+    // ── ProjectTask ──────────────────────────────────────────────────────────
+
+    public List<ProjectTask> findTasksByProject(UUID projectId) {
+        return projectTaskRepo.findByProjectIdOrderByCreatedAt(projectId);
+    }
+
+    public ProjectTask findProjectTaskById(UUID id) {
+        return projectTaskRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ProjectTask", id));
+    }
+
+    @Transactional
+    public ProjectTask createProjectTask(ProjectTask task) {
+        validateProjectTaskStatus(task.getStatus());
+        Project project = findProjectById(task.getProject().getId());
+        task.setProject(project);
+        task.setAssignee(resolveAssignee(task.getAssignee()));
+        return projectTaskRepo.save(task);
+    }
+
+    @Transactional
+    public ProjectTask updateProjectTask(UUID id, ProjectTask patch) {
+        validateProjectTaskStatus(patch.getStatus());
+        ProjectTask existing = findProjectTaskById(id);
+        existing.setName(patch.getName());
+        existing.setDescription(patch.getDescription());
+        existing.setStatus(patch.getStatus());
+        existing.setAssignee(resolveAssignee(patch.getAssignee()));
+        return projectTaskRepo.save(existing);
+    }
+
+    @Transactional
+    public void deleteProjectTask(UUID id) {
+        if (!projectTaskRepo.existsById(id)) throw new ResourceNotFoundException("ProjectTask", id);
+        projectTaskRepo.deleteById(id);
+    }
+
+    // ── ProjectComment / ProjectTaskComment ─────────────────────────────────
+    // authorName always comes from the caller's authenticated session (resolved in
+    // GovernanceController), never client input — see ProjectComment's class doc.
+
+    public List<ProjectComment> findCommentsByProject(UUID projectId) {
+        return projectCommentRepo.findByProjectIdOrderByCreatedAt(projectId);
+    }
+
+    @Transactional
+    public ProjectComment createProjectComment(UUID projectId, String comment, String authorName) {
+        Project project = findProjectById(projectId);
+        return projectCommentRepo.save(ProjectComment.builder()
+                .project(project)
+                .comment(comment)
+                .authorName(authorName)
+                .build());
+    }
+
+    @Transactional
+    public void deleteProjectComment(UUID id) {
+        if (!projectCommentRepo.existsById(id)) throw new ResourceNotFoundException("ProjectComment", id);
+        projectCommentRepo.deleteById(id);
+    }
+
+    public List<ProjectTaskComment> findCommentsByTask(UUID taskId) {
+        return projectTaskCommentRepo.findByProjectTaskIdOrderByCreatedAt(taskId);
+    }
+
+    @Transactional
+    public ProjectTaskComment createProjectTaskComment(UUID taskId, String comment, String authorName) {
+        ProjectTask task = findProjectTaskById(taskId);
+        return projectTaskCommentRepo.save(ProjectTaskComment.builder()
+                .projectTask(task)
+                .comment(comment)
+                .authorName(authorName)
+                .build());
+    }
+
+    @Transactional
+    public void deleteProjectTaskComment(UUID id) {
+        if (!projectTaskCommentRepo.existsById(id)) throw new ResourceNotFoundException("ProjectTaskComment", id);
+        projectTaskCommentRepo.deleteById(id);
+    }
+
+    /** Assignee is optional on both Project and ProjectTask — resolves the full Person only when
+     *  one was actually supplied, rather than forcing every caller to null-check first. */
+    private Person resolveAssignee(Person assignee) {
+        return assignee != null ? personService.findById(assignee.getId()) : null;
+    }
+
     // ── Validators ────────────────────────────────────────────────────────────
 
     private void validateMeetingType(String type) {
@@ -396,5 +532,15 @@ public class GovernanceService {
     private void validateActionItemStatus(String status) {
         if (status != null && !ACTION_ITEM_STATUSES.contains(status))
             throw new IllegalArgumentException("Invalid action item status: " + status + ". Allowed: " + ACTION_ITEM_STATUSES);
+    }
+
+    private void validateProjectStatus(String status) {
+        if (status != null && !PROJECT_STATUSES.contains(status))
+            throw new IllegalArgumentException("Invalid project status: " + status + ". Allowed: " + PROJECT_STATUSES);
+    }
+
+    private void validateProjectTaskStatus(String status) {
+        if (status != null && !PROJECT_TASK_STATUSES.contains(status))
+            throw new IllegalArgumentException("Invalid project task status: " + status + ". Allowed: " + PROJECT_TASK_STATUSES);
     }
 }

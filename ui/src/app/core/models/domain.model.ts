@@ -156,6 +156,51 @@ export interface ActionItem {
   updatedAt?: string;
 }
 
+// ─── Governance: Projects ───────────────────────────────────────────────────
+// Task-tracking projects under Governance — distinct from Finance's Fund/"project"
+// restricted-fund-accounting concept (see the Fund interface below).
+
+export interface Project {
+  id: string;
+  org: Organization;
+  name: string;
+  description?: string;
+  status: 'planning' | 'in_progress' | 'on_hold' | 'completed' | 'cancelled';
+  dueDate?: string;
+  assignee?: Person;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface ProjectTask {
+  id: string;
+  project: Project;
+  name: string;
+  description?: string;
+  status: 'todo' | 'in_progress' | 'blocked' | 'done';
+  assignee?: Person;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** authorName is always stamped server-side from the logged-in session — see
+ *  GovernanceController#resolveAuthorName on the backend; never settable from the client. */
+export interface ProjectComment {
+  id: string;
+  project: Project;
+  comment: string;
+  authorName: string;
+  createdAt?: string;
+}
+
+export interface ProjectTaskComment {
+  id: string;
+  projectTask: ProjectTask;
+  comment: string;
+  authorName: string;
+  createdAt?: string;
+}
+
 // ─── Events ─────────────────────────────────────────────────────────────────
 export interface CalendarEvent {
   id: string;

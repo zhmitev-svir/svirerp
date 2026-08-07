@@ -40,6 +40,21 @@ export interface MemberImportRowError {
   message: string;
 }
 
+/** Response shape of POST /api/organizations/{orgId}/persons/import — imports a Zeffy contacts
+ * export, enrolling anyone not already in the system as an active/inactive Follower. Rows whose
+ * email already matches an existing Person are skipped, not updated. */
+export interface PersonImportResult {
+  created: number;
+  skippedExisting: number;
+  failed: PersonImportRowError[];
+}
+
+export interface PersonImportRowError {
+  rowNumber: number;
+  email: string | null;
+  message: string;
+}
+
 /** Response shape of GET/PUT /api/settings — admin-only runtime config. `value`
  * is always null for SECRET settings; `hasValue` tells the UI whether one is
  * configured without ever exposing it. */

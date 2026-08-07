@@ -376,6 +376,29 @@ public class MembershipService {
                 });
     }
 
+    /**
+     * Unconditionally creates a new Follower Member for a person who is guaranteed not to have one
+     * yet in this org (used by the People import, which only ever calls this for a Person it just
+     * created — unlike {@link #findOrCreateFollowerMember}, which also handles the "may already
+     * exist" case for the Zeffy-transactions path). joinDate is the import date, since a Zeffy
+     * contacts export carries no date of its own. {@code active} drives both status and
+     * emailOptIn together — a person Zeffy reports as unsubscribed is neither.
+     */
+    @Transactional
+    public Member createFollowerMember(UUID personId, UUID orgId, boolean active) {
+        ensureZeffyTierTypesSeeded(orgId);
+        MembershipType follower = typeRepo.findByOrgIdAndNameIgnoreCase(orgId, TierCalculator.FOLLOWER)
+                .orElseThrow(() -> new IllegalStateException("Zeffy tier type not seeded: " + TierCalculator.FOLLOWER));
+        return memberRepo.save(Member.builder()
+                .person(personService.findById(personId))
+                .org(orgService.findById(orgId))
+                .membershipType(follower)
+                .joinDate(LocalDate.now())
+                .status(active ? "active" : "inactive")
+                .emailOptIn(active)
+                .build());
+    }
+
     /** Backs the manual "Recompute Tiers" action — tier can go stale purely from time passing. */
     @Transactional
     public int recomputeAllTiersForOrg(UUID orgId) {
