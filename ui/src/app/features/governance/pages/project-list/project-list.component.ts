@@ -76,7 +76,8 @@ export class ProjectListComponent implements OnInit {
   private orgId: string | null = null;
   page = signal<Page<Project> | null>(null);
   loading = signal(false);
-  pageParams = signal<PageParams>(DEFAULT_PAGE_PARAMS);
+  // Due Date ascending by default — soonest-due projects surface first.
+  pageParams = signal<PageParams>({ ...DEFAULT_PAGE_PARAMS, sort: 'dueDate,asc' });
 
   readonly statuses = STATUSES;
   readonly statusLabels = STATUS_LABELS;

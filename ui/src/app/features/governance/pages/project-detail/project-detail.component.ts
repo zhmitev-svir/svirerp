@@ -10,6 +10,7 @@ import { MatInputModule } from '@angular/material/input';
 import { MatTooltipModule } from '@angular/material/tooltip';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatExpansionModule } from '@angular/material/expansion';
+import { MatMenuModule } from '@angular/material/menu';
 
 import { ProjectService } from '../../services/project.service';
 import { ProjectTaskService } from '../../services/project-task.service';
@@ -28,6 +29,7 @@ const PROJECT_STATUS_LABELS: Record<string, string> = {
   cancelled: 'Cancelled',
 };
 
+const TASK_STATUSES = ['todo', 'in_progress', 'blocked', 'done'] as const;
 const TASK_STATUS_LABELS: Record<string, string> = {
   todo: 'To Do',
   in_progress: 'In Progress',
@@ -62,6 +64,7 @@ function formatDateTime(iso?: string): string {
     MatTooltipModule,
     MatProgressSpinnerModule,
     MatExpansionModule,
+    MatMenuModule,
   ],
   template: `
     @if (project(); as p) {
@@ -107,8 +110,24 @@ function formatDateTime(iso?: string): string {
           <mat-card class="task-card">
             <mat-card-content>
               <div class="task-header">
-                <span class="task-name">{{ task.name }}</span>
-                <span class="status-chip" [attr.data-status]="task.status">{{ taskStatusLabels[task.status] }}</span>
+                <a class="task-name" (click)="editTask(task)">{{ task.name }}</a>
+                <div class="task-header-actions">
+                  <button type="button" class="status-chip" [attr.data-status]="task.status"
+                          [matMenuTriggerFor]="statusMenu" matTooltip="Change status">
+                    {{ taskStatusLabels[task.status] }}
+                    <mat-icon inline>arrow_drop_down</mat-icon>
+                  </button>
+                  <mat-menu #statusMenu="matMenu">
+                    @for (s of statuses; track s) {
+                      <button mat-menu-item [disabled]="s === task.status" (click)="changeTaskStatus(task, s)">
+                        {{ taskStatusLabels[s] }}
+                      </button>
+                    }
+                  </mat-menu>
+                  <button mat-icon-button matTooltip="Delete task" (click)="confirmDeleteTask(task)">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
               </div>
               @if (task.description) {
                 <p class="description">{{ task.description }}</p>
@@ -118,16 +137,6 @@ function formatDateTime(iso?: string): string {
                   <mat-icon inline>person</mat-icon>
                   {{ task.assignee ? (task.assignee.firstName + ' ' + task.assignee.lastName) : 'Unassigned' }}
                 </span>
-              </div>
-              <div class="task-actions">
-                <button mat-button (click)="editTask(task)">
-                  <mat-icon>edit</mat-icon>
-                  Edit
-                </button>
-                <button mat-button (click)="confirmDeleteTask(task)">
-                  <mat-icon>delete</mat-icon>
-                  Delete
-                </button>
               </div>
             </mat-card-content>
 
@@ -211,16 +220,22 @@ function formatDateTime(iso?: string): string {
     .section-header h2 { margin: 0; }
 
     .task-header { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-    .task-name { font-weight: 500; font-size: 1.05em; }
+    .task-name { font-weight: 500; font-size: 1.05em; color: #3f51b5; cursor: pointer; text-decoration: none; }
+    .task-name:hover { text-decoration: underline; }
+    .task-header-actions { display: flex; align-items: center; gap: 4px; }
     .status-chip {
-      display: inline-block; padding: 2px 10px; border-radius: 12px; font-size: .78em;
-      background: rgba(0,0,0,.08); white-space: nowrap;
+      display: inline-flex; align-items: center; padding: 2px 6px 2px 10px; border-radius: 12px; font-size: .78em;
+      background: rgba(0,0,0,.08); white-space: nowrap; border: none; font-family: inherit; cursor: pointer;
     }
+    .status-chip:hover { background: rgba(0,0,0,.16); }
     .status-chip[data-status="done"], .status-chip[data-status="completed"] { background: #c8e6c9; }
+    .status-chip[data-status="done"]:hover, .status-chip[data-status="completed"]:hover { background: #a5d6a7; }
     .status-chip[data-status="blocked"], .status-chip[data-status="cancelled"] { background: #ffcdd2; }
+    .status-chip[data-status="blocked"]:hover, .status-chip[data-status="cancelled"]:hover { background: #ef9a9a; }
     .status-chip[data-status="in_progress"] { background: #bbdefb; }
+    .status-chip[data-status="in_progress"]:hover { background: #90caf9; }
     .status-chip[data-status="on_hold"] { background: #ffe0b2; }
-    .task-actions { display: flex; flex-wrap: wrap; gap: 4px; margin: 4px 0 8px; }
+    .status-chip[data-status="on_hold"]:hover { background: #ffcc80; }
 
     .comment-thread { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
     .comment { border-left: 3px solid rgba(0,0,0,.1); padding-left: 10px; }
@@ -245,6 +260,7 @@ export class ProjectDetailComponent implements OnInit {
 
   readonly statusLabels = PROJECT_STATUS_LABELS;
   readonly taskStatusLabels = TASK_STATUS_LABELS;
+  readonly statuses = TASK_STATUSES;
   formatDateTime = formatDateTime;
 
   project = signal<Project | null>(null);
@@ -297,6 +313,25 @@ export class ProjectDetailComponent implements OnInit {
       .open(ProjectTaskFormComponent, { width: '540px', data: { projectId: this.projectId, task } })
       .afterClosed()
       .subscribe(saved => { if (saved) this.loadTasks(); });
+  }
+
+  /** Status-chip dropdown — persists immediately on selection, no dialog/confirmation needed since
+   *  it's a same-domain, easily-reversible field (unlike name/description/assignee, still edited
+   *  via the full form behind the task-name link). */
+  changeTaskStatus(task: ProjectTask, status: string): void {
+    if (status === task.status) return;
+    const payload = {
+      project: { id: task.project.id },
+      name: task.name,
+      description: task.description,
+      status,
+      assignee: task.assignee ? { id: task.assignee.id } : null,
+    } as unknown as Partial<ProjectTask>;
+    this.taskService.update(task.id, payload).subscribe({
+      next: updated => {
+        this.tasks.update(list => list.map(t => (t.id === task.id ? updated : t)));
+      },
+    });
   }
 
   confirmDeleteTask(task: ProjectTask): void {
