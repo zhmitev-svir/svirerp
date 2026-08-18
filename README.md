@@ -2,6 +2,8 @@
 
 Non-profit ERP system for the SVIR organization — Spring Boot 3 REST API backed by MySQL 8 with Flyway schema migrations.
 
+See [ARCHITECTURE.md](ARCHITECTURE.md) for a design/architecture overview (backend + frontend structure, auth model, third-party dependencies), or [SETUP.md](SETUP.md) for step-by-step install instructions starting from a blank machine — this file covers configuration and the full API/migration reference.
+
 ---
 
 ## Table of Contents
@@ -157,6 +159,7 @@ java -jar target/svirerp-1.0.0-SNAPSHOT.jar \
 | `app.auth.google.allowed-domain` | `svivanrilski.com` | Google Workspace hosted domain allowed to sign in; override via `SVIRERP_GOOGLE_ALLOWED_DOMAIN` |
 | `app.auth.admin.username` / `app.auth.admin.password-hash` | *(empty — disabled)* | Break-glass local admin login; blank disables it. Set via `SVIRERP_ADMIN_USERNAME` / `SVIRERP_ADMIN_PASSWORD_HASH` |
 | `app.settings.encryption-key` / `app.settings.encryption-salt` | *(empty — required for SECRET settings)* | Encrypts `SECRET`-type rows in the `app_setting` table (e.g. the Google OAuth client secret). Salt must be hex-encoded. Set via `SVIRERP_SETTINGS_ENCRYPTION_KEY` / `SVIRERP_SETTINGS_ENCRYPTION_SALT` — see [Admin Settings](#admin-settings) |
+| `server.servlet.session.timeout` / `server.servlet.session.cookie.max-age` | `7d` / `7d` | How long a login lasts — both the server-side session and the browser's session cookie survive a browser restart for 7 days, rather than Spring Boot's defaults (30-minute inactivity timeout, and a cookie that's wiped the instant the browser closes) |
 
 > **Note:** The Google OAuth 2.0 client ID/secret are **not** properties — they're configured at runtime via the admin-only Settings page and stored (secret encrypted) in the `app_setting` table, so they can be rotated with no restart. See [Admin Settings](#admin-settings).
 
@@ -189,6 +192,10 @@ A single admin account, for when Google sign-in is unavailable. Disabled by defa
 3. Sign in at `/portal-access` — this route is intentionally not linked from the login page or any navigation; it's meant to be known only to whoever holds the admin credentials.
 
 Failed attempts are rate-limited (5 failures per IP within 15 minutes triggers a 15-minute lockout) and every attempt — success, failure, or lockout — is audit-logged under the `AUDIT.local-admin-login` logger name.
+
+### Session duration
+
+A login persists for 7 days (`server.servlet.session.timeout` / `server.servlet.session.cookie.max-age`, see [Key properties](#key-properties)) — the session cookie survives closing the browser instead of dying immediately, the original Spring Boot/Tomcat default. Sessions are in-memory only (no Redis/JDBC session store), so restarting the app still forces a fresh login regardless of this setting.
 
 ---
 
@@ -411,6 +418,8 @@ npm run build        # production build → ui/dist/svirerp-ui/browser/
 `npm start` proxies `/api`, `/oauth2`, `/login`, and `/logout` to `http://localhost:8080` (see `ui/proxy.conf.json`), so the browser sees the dev server as same-origin — matching production, where Spring Boot serves both the UI and the API from one origin. This matters for session-cookie-based login: cross-origin cookies would need extra `SameSite`/HTTPS handling that same-origin avoids entirely.
 
 Visiting the app while logged out redirects to `/login` (Google sign-in). The break-glass local admin form lives at `/portal-access` — see [Authentication](#authentication).
+
+**Shareable links** (e.g. a Project or Meeting Minutes detail page) work even when the recipient isn't logged in yet: `authGuard` (`ui/src/app/core/guards/auth.guard.ts`) saves the originally-requested URL to `sessionStorage` before redirecting to `/login`, then restores and navigates to it as soon as the user is authenticated — regardless of which login method they use. This is `sessionStorage`-backed rather than a `?returnUrl=` query param or in-memory router state, specifically because Google sign-in is a full-page redirect away to accounts.google.com and back; `sessionStorage` (scoped to the tab + origin) is what actually survives that round trip. The error interceptor (`error.interceptor.ts`) does the same thing on a mid-session 401 (session expired while already on a page), via the shared `ReturnUrlService`.
 
 ---
 
