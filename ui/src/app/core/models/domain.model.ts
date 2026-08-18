@@ -201,6 +201,30 @@ export interface ProjectTaskComment {
   createdAt?: string;
 }
 
+/** A checklist attached to a Project — a sibling of ProjectTask, not nested under one. A project
+ *  can hold multiple independent checklists (see ProjectChecklist.java's class doc). */
+export interface ProjectChecklist {
+  id: string;
+  project: Project;
+  title: string;
+  completionDate?: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+/** Deliberately 3-state, not a boolean checkbox — see ProjectChecklistItem.java's class doc.
+ *  `detail` is an optional one-line note captured when marking Done/Skipped; Re-open always
+ *  clears it (enforced server-side, not just in the UI). */
+export interface ProjectChecklistItem {
+  id: string;
+  checklist: ProjectChecklist;
+  text: string;
+  detail?: string;
+  status: 'new' | 'done' | 'skipped';
+  createdAt?: string;
+  updatedAt?: string;
+}
+
 // ─── Events ─────────────────────────────────────────────────────────────────
 export interface CalendarEvent {
   id: string;

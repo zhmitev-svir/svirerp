@@ -13,6 +13,7 @@ import com.svivanrilski.svirerp.person.PersonService;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
 
@@ -45,6 +46,8 @@ public class GovernanceService {
     private final ProjectTaskRepository projectTaskRepo;
     private final ProjectCommentRepository projectCommentRepo;
     private final ProjectTaskCommentRepository projectTaskCommentRepo;
+    private final ProjectChecklistRepository projectChecklistRepo;
+    private final ProjectChecklistItemRepository projectChecklistItemRepo;
     private final OrganizationService orgService;
     private final PersonService personService;
 
@@ -499,6 +502,92 @@ public class GovernanceService {
     public void deleteProjectTaskComment(UUID id) {
         if (!projectTaskCommentRepo.existsById(id)) throw new ResourceNotFoundException("ProjectTaskComment", id);
         projectTaskCommentRepo.deleteById(id);
+    }
+
+    // ── ProjectChecklist / ProjectChecklistItem ─────────────────────────────
+    // A sibling of ProjectTask under Project (V50; reworked off a 1:1-on-task design after real
+    // usage showed "create a task first just to attach a checklist" was one step too many) — a
+    // project can hold multiple independent checklists, each with its own title/items.
+
+    public List<ProjectChecklist> findChecklistsByProject(UUID projectId) {
+        return projectChecklistRepo.findByProjectIdOrderByCreatedAt(projectId);
+    }
+
+    public ProjectChecklist findChecklistById(UUID id) {
+        return projectChecklistRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ProjectChecklist", id));
+    }
+
+    @Transactional
+    public ProjectChecklist createChecklist(UUID projectId, String title, LocalDate completionDate) {
+        Project project = findProjectById(projectId);
+        ProjectChecklist checklist = ProjectChecklist.builder()
+                .project(project)
+                .title(title)
+                .completionDate(completionDate)
+                .build();
+        return projectChecklistRepo.save(checklist);
+    }
+
+    @Transactional
+    public ProjectChecklist updateChecklist(UUID id, String title, LocalDate completionDate) {
+        ProjectChecklist existing = findChecklistById(id);
+        existing.setTitle(title);
+        existing.setCompletionDate(completionDate);
+        return projectChecklistRepo.save(existing);
+    }
+
+    @Transactional
+    public void deleteChecklist(UUID id) {
+        if (!projectChecklistRepo.existsById(id)) throw new ResourceNotFoundException("ProjectChecklist", id);
+        projectChecklistRepo.deleteById(id);
+    }
+
+    public List<ProjectChecklistItem> findChecklistItems(UUID checklistId) {
+        return projectChecklistItemRepo.findByChecklistIdOrderByCreatedAt(checklistId);
+    }
+
+    @Transactional
+    public ProjectChecklistItem addChecklistItem(UUID checklistId, String text) {
+        ProjectChecklist checklist = findChecklistById(checklistId);
+        return projectChecklistItemRepo.save(ProjectChecklistItem.builder()
+                .checklist(checklist)
+                .text(text)
+                .status("new")
+                .build());
+    }
+
+    @Transactional
+    public void deleteChecklistItem(UUID id) {
+        if (!projectChecklistItemRepo.existsById(id)) throw new ResourceNotFoundException("ProjectChecklistItem", id);
+        projectChecklistItemRepo.deleteById(id);
+    }
+
+    @Transactional
+    public ProjectChecklistItem markChecklistItemDone(UUID id, String detail) {
+        return setChecklistItemStatus(id, "done", detail);
+    }
+
+    @Transactional
+    public ProjectChecklistItem markChecklistItemSkipped(UUID id, String detail) {
+        return setChecklistItemStatus(id, "skipped", detail);
+    }
+
+    /** The only transition available once an item is done or skipped — always returns it to
+     *  "new", re-enabling the Done/Skip actions, per the checklist's 3-state design. Always clears
+     *  {@code detail} too (not just a frontend-side clear) — a reopened item is "new" again, and a
+     *  stale note from the previous Done/Skip would be misleading. */
+    @Transactional
+    public ProjectChecklistItem reopenChecklistItem(UUID id) {
+        return setChecklistItemStatus(id, "new", null);
+    }
+
+    private ProjectChecklistItem setChecklistItemStatus(UUID id, String status, String detail) {
+        ProjectChecklistItem item = projectChecklistItemRepo.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("ProjectChecklistItem", id));
+        item.setStatus(status);
+        item.setDetail(detail);
+        return projectChecklistItemRepo.save(item);
     }
 
     /** Assignee is optional on both Project and ProjectTask — resolves the full Person only when

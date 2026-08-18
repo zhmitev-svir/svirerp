@@ -14,12 +14,17 @@ import { MatMenuModule } from '@angular/material/menu';
 
 import { ProjectService } from '../../services/project.service';
 import { ProjectTaskService } from '../../services/project-task.service';
+import { ProjectChecklistService } from '../../services/project-checklist.service';
 import { NotificationService } from '../../../../core/services/notification.service';
-import { Project, ProjectTask, ProjectComment, ProjectTaskComment } from '../../../../core/models/domain.model';
+import {
+  Project, ProjectTask, ProjectComment, ProjectTaskComment, ProjectChecklist, ProjectChecklistItem,
+} from '../../../../core/models/domain.model';
 import { PageHeaderComponent } from '../../../../shared/components/page-header/page-header.component';
 import { ConfirmDialogComponent } from '../../../../shared/components/confirm-dialog/confirm-dialog.component';
 import { ProjectFormComponent } from '../project-form/project-form.component';
 import { ProjectTaskFormComponent } from '../project-task-form/project-task-form.component';
+import { ProjectChecklistFormComponent } from '../project-checklist-form/project-checklist-form.component';
+import { ChecklistItemActionFormComponent } from '../checklist-item-action-form/checklist-item-action-form.component';
 
 const PROJECT_STATUS_LABELS: Record<string, string> = {
   planning: 'Planning',
@@ -48,6 +53,11 @@ function formatDateTime(iso?: string): string {
  * it). Each task's comment thread is a collapsed-by-default `mat-expansion-panel` — lazy-loaded on
  * first open — rather than a separate routed page, so drilling into a task's discussion never
  * costs a full navigation on a phone.
+ *
+ * Checklists are a sibling section to Tasks, not nested inside a task card — originally a
+ * checklist was 1:1 on a single ProjectTask, but real usage showed "create a task first just to
+ * attach a checklist" was one step too many, so it was reworked (V50) to hang directly off the
+ * Project, same as Tasks do. A project can have multiple independent checklists.
  */
 @Component({
   selector: 'app-project-detail',
@@ -177,6 +187,73 @@ function formatDateTime(iso?: string): string {
         }
 
         <div class="section-header">
+          <h2 class="mat-headline-6">Checklists</h2>
+          <button mat-stroked-button (click)="addChecklist()">
+            <mat-icon>add</mat-icon>
+            Add Checklist
+          </button>
+        </div>
+
+        @for (cl of checklists(); track cl.id) {
+          <mat-card class="checklist-card">
+            <mat-card-content>
+              <div class="task-header">
+                <a class="task-name" (click)="editChecklist(cl)">{{ cl.title }}</a>
+                <div class="task-header-actions">
+                  @if (cl.completionDate) {
+                    <span class="meta-item">
+                      <mat-icon inline>event</mat-icon>
+                      Due {{ cl.completionDate }}
+                    </span>
+                  }
+                  <button mat-icon-button matTooltip="Delete checklist" (click)="confirmDeleteChecklist(cl)">
+                    <mat-icon>delete</mat-icon>
+                  </button>
+                </div>
+              </div>
+
+              <div class="checklist-items">
+                @for (item of checklistItems()[cl.id] ?? []; track item.id) {
+                  <div class="checklist-item" [attr.data-status]="item.status">
+                    <div class="item-text-col">
+                      <span class="item-text">{{ item.text }}</span>
+                      @if (item.detail) {
+                        <span class="item-detail">{{ item.detail }}</span>
+                      }
+                    </div>
+                    <div class="item-actions">
+                      @if (item.status === 'new') {
+                        <button mat-stroked-button color="primary" (click)="markItemDone(cl.id, item)">Done</button>
+                        <button mat-stroked-button (click)="markItemSkipped(cl.id, item)">Skip</button>
+                      } @else {
+                        <span class="item-status-label">{{ item.status === 'done' ? 'Done' : 'Skipped' }}</span>
+                        <button mat-stroked-button (click)="reopenItem(cl.id, item)">Re-open</button>
+                      }
+                    </div>
+                  </div>
+                } @empty {
+                  <p class="empty">No checklist items yet.</p>
+                }
+              </div>
+
+              <div class="add-comment">
+                <mat-form-field appearance="outline" class="full-width no-hint">
+                  <input matInput placeholder="Add a checklist item…" [(ngModel)]="newItemText[cl.id]"
+                      (keyup.enter)="addChecklistItem(cl.id)" />
+                </mat-form-field>
+                <button mat-flat-button color="primary"
+                        [disabled]="!newItemText[cl.id]?.trim() || postingItem[cl.id]"
+                        (click)="addChecklistItem(cl.id)">
+                  Add Item
+                </button>
+              </div>
+            </mat-card-content>
+          </mat-card>
+        } @empty {
+          <p class="empty">No checklists yet.</p>
+        }
+
+        <div class="section-header">
           <h2 class="mat-headline-6">Comments</h2>
         </div>
 
@@ -212,7 +289,7 @@ function formatDateTime(iso?: string): string {
     }
   `,
   styles: [`
-    .summary-card, .task-card, .comment-thread-card { margin-bottom: 16px; }
+    .summary-card, .task-card, .checklist-card, .comment-thread-card { margin-bottom: 16px; }
     .description { white-space: pre-wrap; margin: 0 0 12px; }
     .meta-row { display: flex; flex-wrap: wrap; gap: 16px; color: rgba(0,0,0,.6); font-size: .9em; }
     .meta-item { display: flex; align-items: center; gap: 4px; }
@@ -237,6 +314,20 @@ function formatDateTime(iso?: string): string {
     .status-chip[data-status="on_hold"] { background: #ffe0b2; }
     .status-chip[data-status="on_hold"]:hover { background: #ffcc80; }
 
+    .checklist-items { display: flex; flex-direction: column; gap: 8px; padding: 4px 0; }
+    .checklist-item {
+      display: flex; align-items: center; justify-content: space-between; gap: 12px;
+      padding: 8px 10px; border-radius: 6px; background: rgba(0,0,0,.03);
+    }
+    .checklist-item[data-status="done"] { background: #e8f5e9; }
+    .checklist-item[data-status="skipped"] { background: #fafafa; }
+    .checklist-item[data-status="skipped"] .item-text { color: rgba(0,0,0,.5); text-decoration: line-through; }
+    .item-text-col { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .item-text { word-break: break-word; }
+    .item-detail { font-size: .82em; color: rgba(0,0,0,.6); word-break: break-word; }
+    .item-actions { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+    .item-status-label { font-size: .85em; color: rgba(0,0,0,.6); }
+
     .comment-thread { display: flex; flex-direction: column; gap: 12px; padding: 8px 0; }
     .comment { border-left: 3px solid rgba(0,0,0,.1); padding-left: 10px; }
     .comment-meta { display: flex; flex-wrap: wrap; gap: 8px; font-size: .85em; color: rgba(0,0,0,.6); }
@@ -253,6 +344,7 @@ export class ProjectDetailComponent implements OnInit {
   private route = inject(ActivatedRoute);
   private projectService = inject(ProjectService);
   private taskService = inject(ProjectTaskService);
+  private checklistService = inject(ProjectChecklistService);
   private dialog = inject(MatDialog);
   private notifications = inject(NotificationService);
 
@@ -276,9 +368,18 @@ export class ProjectDetailComponent implements OnInit {
   newTaskComment: Record<string, string> = {};
   postingTaskComment: Record<string, boolean> = {};
 
+  // Checklists are a project-level list (sibling to Tasks), fetched eagerly alongside them rather
+  // than lazy-loaded per-card — there's no task gate to hide behind any more (V50).
+  checklists = signal<ProjectChecklist[]>([]);
+  // Keyed by checklistId — that's what item CRUD is scoped to.
+  checklistItems = signal<Record<string, ProjectChecklistItem[] | undefined>>({});
+  newItemText: Record<string, string> = {};
+  postingItem: Record<string, boolean> = {};
+
   ngOnInit(): void {
     this.loadProject();
     this.loadTasks();
+    this.loadChecklists();
     this.loadComments();
   }
 
@@ -369,6 +470,107 @@ export class ProjectDetailComponent implements OnInit {
     });
   }
 
+  /** Title/Completion Date creation happens in a modal, same as Add Task — see
+   *  ProjectChecklistFormComponent's class doc for why, rather than an inline form on this page. */
+  addChecklist(): void {
+    this.dialog
+      .open(ProjectChecklistFormComponent, { width: '480px', data: { projectId: this.projectId, checklist: null } })
+      .afterClosed()
+      .subscribe((created?: ProjectChecklist) => {
+        if (created) {
+          this.checklists.update(list => [...list, created]);
+          this.checklistItems.update(map => ({ ...map, [created.id]: [] }));
+        }
+      });
+  }
+
+  /** Title/Completion Date are read-only in the list — clicking the title reopens the same modal
+   *  used to create it, same affordance as a task's name. */
+  editChecklist(cl: ProjectChecklist): void {
+    this.dialog
+      .open(ProjectChecklistFormComponent, { width: '480px', data: { projectId: this.projectId, checklist: cl } })
+      .afterClosed()
+      .subscribe((updated?: ProjectChecklist) => {
+        if (updated) {
+          this.checklists.update(list => list.map(c => (c.id === updated.id ? updated : c)));
+        }
+      });
+  }
+
+  confirmDeleteChecklist(cl: ProjectChecklist): void {
+    this.dialog
+      .open(ConfirmDialogComponent, {
+        data: {
+          title: 'Delete Checklist',
+          message: `Delete "${cl.title}" and all of its items? This cannot be undone.`,
+          confirmLabel: 'Delete',
+        },
+      })
+      .afterClosed()
+      .subscribe(confirmed => { if (confirmed) this.deleteChecklist(cl); });
+  }
+
+  addChecklistItem(checklistId: string): void {
+    const text = this.newItemText[checklistId]?.trim();
+    if (!text) return;
+    this.postingItem[checklistId] = true;
+    this.checklistService.addItem(checklistId, text).subscribe({
+      next: created => {
+        this.checklistItems.update(map => ({ ...map, [checklistId]: [...(map[checklistId] ?? []), created] }));
+        this.newItemText[checklistId] = '';
+        this.postingItem[checklistId] = false;
+      },
+      error: () => { this.postingItem[checklistId] = false; },
+    });
+  }
+
+  /** Opens the optional-detail modal first — "modal entry" for Done/Skip, same as checklist
+   *  creation, rather than an inline field on the item row. `result === undefined` means the
+   *  dialog was cancelled (backdrop/Cancel); `''` means confirmed with no detail entered. */
+  markItemDone(checklistId: string, item: ProjectChecklistItem): void {
+    this.dialog
+      .open(ChecklistItemActionFormComponent, { width: '420px', data: { action: 'done', itemText: item.text } })
+      .afterClosed()
+      .subscribe((result?: string) => {
+        if (result === undefined) return;
+        this.checklistService.markDone(item.id, result).subscribe(updated => this.replaceChecklistItem(checklistId, updated));
+      });
+  }
+
+  markItemSkipped(checklistId: string, item: ProjectChecklistItem): void {
+    this.dialog
+      .open(ChecklistItemActionFormComponent, { width: '420px', data: { action: 'skipped', itemText: item.text } })
+      .afterClosed()
+      .subscribe((result?: string) => {
+        if (result === undefined) return;
+        this.checklistService.markSkipped(item.id, result).subscribe(updated => this.replaceChecklistItem(checklistId, updated));
+      });
+  }
+
+  /** Re-opening always clears `detail` server-side (see GovernanceService#reopenChecklistItem) —
+   *  when one exists, warn that it'll be lost and require confirmation before clearing it; an item
+   *  with no detail has nothing to lose, so it reopens immediately with no prompt. */
+  reopenItem(checklistId: string, item: ProjectChecklistItem): void {
+    if (!item.detail) {
+      this.doReopen(checklistId, item);
+      return;
+    }
+    this.dialog
+      .open(ConfirmDialogComponent, {
+        data: {
+          title: 'Re-open Item',
+          message: `This item has a detail recorded: "${item.detail}". Re-opening will clear it. Continue?`,
+          confirmLabel: 'Re-open',
+        },
+      })
+      .afterClosed()
+      .subscribe(confirmed => { if (confirmed) this.doReopen(checklistId, item); });
+  }
+
+  private doReopen(checklistId: string, item: ProjectChecklistItem): void {
+    this.checklistService.reopen(item.id).subscribe(updated => this.replaceChecklistItem(checklistId, updated));
+  }
+
   addComment(): void {
     const text = this.newComment.trim();
     if (!text) return;
@@ -393,6 +595,39 @@ export class ProjectDetailComponent implements OnInit {
 
   private loadComments(): void {
     this.projectService.getComments(this.projectId).subscribe(list => this.comments.set(list));
+  }
+
+  private loadChecklists(): void {
+    this.checklistService.getForProject(this.projectId).subscribe(list => {
+      this.checklists.set(list);
+      list.forEach(cl => this.loadChecklistItems(cl.id));
+    });
+  }
+
+  private loadChecklistItems(checklistId: string): void {
+    this.checklistService.getItems(checklistId).subscribe(items => {
+      this.checklistItems.update(map => ({ ...map, [checklistId]: items }));
+    });
+  }
+
+  private replaceChecklistItem(checklistId: string, updated: ProjectChecklistItem): void {
+    this.checklistItems.update(map => ({
+      ...map,
+      [checklistId]: (map[checklistId] ?? []).map(i => (i.id === updated.id ? updated : i)),
+    }));
+  }
+
+  private deleteChecklist(cl: ProjectChecklist): void {
+    this.checklistService.remove(cl.id).subscribe({
+      next: () => {
+        this.checklists.update(list => list.filter(c => c.id !== cl.id));
+        this.checklistItems.update(map => {
+          const { [cl.id]: _removed, ...rest } = map;
+          return rest;
+        });
+        this.notifications.success('Checklist deleted.');
+      },
+    });
   }
 
   private deleteTask(task: ProjectTask): void {

@@ -301,6 +301,82 @@ public class GovernanceController {
         return ResponseEntity.noContent().build();
     }
 
+    // ── ProjectChecklist / ProjectChecklistItem ─────────────────────────────
+    // A sibling of ProjectTask under Project, not nested under one — see GovernanceService's
+    // ProjectChecklist section for why (V50).
+
+    @GetMapping("/api/projects/{projectId}/checklists")
+    public List<ProjectChecklist> listChecklists(@PathVariable UUID projectId) {
+        return service.findChecklistsByProject(projectId);
+    }
+
+    // A dedicated request record rather than @Valid ProjectChecklist itself — the entity's own
+    // project field is @NotNull (correct for the entity), but the client must never supply it here
+    // since it's already resolved from the projectId path variable; reusing the entity for the
+    // request body would force the client to redundantly echo it back, same reasoning as
+    // CommentRequest below.
+    public record ChecklistRequest(@NotBlank String title, LocalDate completionDate) {
+    }
+
+    @PostMapping("/api/projects/{projectId}/checklists")
+    public ResponseEntity<ProjectChecklist> createChecklist(@PathVariable UUID projectId,
+            @Valid @RequestBody ChecklistRequest request) {
+        ProjectChecklist created = service.createChecklist(projectId, request.title(), request.completionDate());
+        return ResponseEntity.status(HttpStatus.CREATED).body(created);
+    }
+
+    @PutMapping("/api/project-checklists/{id}")
+    public ProjectChecklist updateChecklist(@PathVariable UUID id, @Valid @RequestBody ChecklistRequest request) {
+        return service.updateChecklist(id, request.title(), request.completionDate());
+    }
+
+    @DeleteMapping("/api/project-checklists/{id}")
+    public ResponseEntity<Void> deleteChecklist(@PathVariable UUID id) {
+        service.deleteChecklist(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    public record ChecklistItemRequest(@NotBlank String text) {
+    }
+
+    @GetMapping("/api/project-checklists/{checklistId}/items")
+    public List<ProjectChecklistItem> listChecklistItems(@PathVariable UUID checklistId) {
+        return service.findChecklistItems(checklistId);
+    }
+
+    @PostMapping("/api/project-checklists/{checklistId}/items")
+    public ResponseEntity<ProjectChecklistItem> addChecklistItem(@PathVariable UUID checklistId,
+            @Valid @RequestBody ChecklistItemRequest request) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(service.addChecklistItem(checklistId, request.text()));
+    }
+
+    @DeleteMapping("/api/project-checklist-items/{id}")
+    public ResponseEntity<Void> deleteChecklistItem(@PathVariable UUID id) {
+        service.deleteChecklistItem(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // detail is optional (no @NotBlank) — Done/Skip both work with no note at all.
+    public record ChecklistItemActionRequest(String detail) {
+    }
+
+    @PostMapping("/api/project-checklist-items/{id}/done")
+    public ProjectChecklistItem markChecklistItemDone(@PathVariable UUID id,
+            @RequestBody(required = false) ChecklistItemActionRequest request) {
+        return service.markChecklistItemDone(id, request != null ? request.detail() : null);
+    }
+
+    @PostMapping("/api/project-checklist-items/{id}/skip")
+    public ProjectChecklistItem markChecklistItemSkipped(@PathVariable UUID id,
+            @RequestBody(required = false) ChecklistItemActionRequest request) {
+        return service.markChecklistItemSkipped(id, request != null ? request.detail() : null);
+    }
+
+    @PostMapping("/api/project-checklist-items/{id}/reopen")
+    public ProjectChecklistItem reopenChecklistItem(@PathVariable UUID id) {
+        return service.reopenChecklistItem(id);
+    }
+
     // ── ProjectComment / ProjectTaskComment ─────────────────────────────────
     // POST bodies only ever carry the comment text — authorName is always resolved server-side
     // from the caller's own session (see resolveAuthorName), never trusted from the client.
